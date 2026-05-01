@@ -72,7 +72,11 @@ function Setup() {
 
   // Auto-start when multiplayer game starts
   useEffect(() => {
-    if (gameStarted && status === 'setup' && roomPlayers.length >= 2) {
+    if (
+      gameStarted &&
+      (status === 'setup' || status === 'lobby') &&
+      roomPlayers.length >= 2
+    ) {
       startGameWithPlayers(roomPlayers);
     }
   }, [gameStarted]);

@@ -59,7 +59,6 @@ export function SocketProvider({ children }) {
     });
 
     newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id);
       setConnected(true);
 
       // Attempt rejoin on reconnect
