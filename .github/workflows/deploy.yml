@@ -1,0 +1,56 @@
+name: Build & Deploy Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🧾 Checkout source
+        uses: actions/checkout@v4
+
+      - name: 📁 Inject .env file
+        run: echo "${{ secrets.PRODUCTION_ENV }}" > .env
+
+      - name: 🔑 Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: 🛠️ Build & Push Docker Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/monopoly:production
+          cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/monopoly:production
+          cache-to: type=inline
+          build-args: |
+            NODE_ENV=production
+
+      - name: 📤 Upload .env to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: '.env'
+          target: '~/monopoly/'
+          overwrite: true
+
+      - name: 🚀 Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/monopoly
+            docker compose pull monopoly || docker pull ${{ secrets.DOCKERHUB_USERNAME }}/monopoly:production
+            docker compose up -d monopoly
+            docker image prune -f
