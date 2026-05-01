@@ -46,8 +46,10 @@ export function SocketProvider({ children }) {
   const rejoinAttempted = useRef(false);
 
   useEffect(() => {
-    // Connect to server using same hostname (works for LAN)
-    const serverUrl = `http://${window.location.hostname}:5000`;
+    // In production, connect to same origin. In dev, connect to port 5000.
+    const serverUrl = import.meta.env.PROD
+      ? window.location.origin
+      : `http://${window.location.hostname}:5000`;
     const newSocket = io(serverUrl, {
       autoConnect: true,
       reconnection: true,
