@@ -1,0 +1,668 @@
+@import 'tailwindcss';
+
+/* ========== BASE STYLES ========== */
+body {
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+td {
+  font-size: 11px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  text-align: center;
+}
+
+/* ========== BOARD WRAPPER & ZOOM ========== */
+.board-wrapper {
+  position: relative;
+  order: 1;
+  max-width: 100%;
+}
+
+.board-scroll-container {
+  overflow: auto;
+  max-height: 88vh;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.board-zoom-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 20;
+  display: flex;
+  gap: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.board-zoom-controls button {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: rgba(0, 0, 0, 0.04);
+  color: #333;
+  font-size: 18px;
+  font-weight: bold;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.board-zoom-controls button:hover {
+  background: rgba(0, 0, 0, 0.1);
+  transform: scale(1.05);
+}
+
+.board-zoom-controls button:active {
+  transform: scale(0.95);
+}
+
+.board-zoom-controls .board-zoom-label {
+  width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #555;
+}
+
+/* ========== BOARD ========== */
+#board {
+  border-collapse: separate;
+  border-spacing: 1px;
+  background: #d4cfc7;
+  border-radius: 10px;
+  overflow: hidden;
+  transition: zoom 0.15s ease;
+}
+
+/* ========== BOARD CENTER ========== */
+.board-center {
+  width: 675px;
+  border: none;
+  vertical-align: top;
+  background: linear-gradient(145deg, #f8f9fa 0%, #ffffff 40%, #f0f1f2 100%);
+  position: relative;
+  padding: 8px;
+}
+
+.board-center-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
+.board-center-logo {
+  font-family: 'Georgia', 'Times New Roman', serif;
+  font-size: 22px;
+  font-weight: bold;
+  color: rgba(0, 0, 0, 0.12);
+  letter-spacing: 10px;
+  text-transform: uppercase;
+  text-align: center;
+  user-select: none;
+  padding: 4px 0;
+}
+
+.board-center-panels {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* ========== JAIL ========== */
+#jail {
+  border: 2px solid rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  height: 65px;
+  width: 65px;
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px;
+}
+
+.jail-label {
+  font-size: 7px;
+  font-weight: 700;
+  color: rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  width: 100%;
+  text-align: center;
+}
+
+/* ========== BOARD CELLS ========== */
+.cell {
+  position: relative;
+  padding: 0;
+  vertical-align: bottom;
+  background: #eee8dc;
+  background-repeat: no-repeat;
+  background-size: auto 40px;
+  transition: background-color 0.15s ease;
+}
+
+.cell:hover {
+  background-color: #e2dace;
+  z-index: 3;
+}
+
+.board-corner {
+  width: 102px;
+  height: 102px;
+  background: #d9d2c5;
+}
+
+.board-corner:hover {
+  background-color: #cec7ba;
+}
+
+.board-top {
+  width: 72px;
+  height: 102px;
+}
+
+.board-bottom {
+  width: 72px;
+  height: 102px;
+}
+
+.board-left {
+  width: 102px;
+  height: 72px;
+}
+
+.board-right {
+  width: 102px;
+  height: 72px;
+}
+
+/* ========== CELL INTERNALS ========== */
+.cell-anchor {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Color strips for property groups */
+.cell-color-strip {
+  position: absolute;
+  z-index: 1;
+}
+
+.board-top .cell-color-strip {
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.board-bottom .cell-color-strip {
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 24px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.board-left .cell-color-strip {
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 100%;
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.board-right .cell-color-strip {
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 100%;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.cell-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  text-align: center;
+  width: 100%;
+  font-size: 9px;
+  line-height: 1.15;
+  padding: 2px 1px;
+  z-index: 2;
+  font-weight: 500;
+  color: #333;
+}
+
+.cell-position-holder {
+  width: 100%;
+  height: 100%;
+  z-index: 4;
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  padding: 2px;
+}
+
+.cell-position {
+  height: 14px;
+  width: 14px;
+  display: inline-block;
+  border-radius: 50%;
+  margin: 1px;
+  box-shadow:
+    0 0 0 1.5px white,
+    0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease;
+}
+
+.cell-position:hover {
+  transform: scale(1.3);
+  z-index: 10;
+}
+
+/* ========== CELL OWNER INDICATORS ========== */
+.cell-owner {
+  display: none;
+  position: absolute;
+  border-radius: 2px;
+  opacity: 0.85;
+  z-index: 3;
+}
+
+.board-top .cell-owner {
+  height: 5px;
+  left: 2px;
+  right: 2px;
+  top: 2px;
+  width: auto;
+}
+
+.board-bottom .cell-owner {
+  height: 5px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  width: auto;
+}
+
+.board-left .cell-owner {
+  width: 5px;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  height: auto;
+}
+
+.board-right .cell-owner {
+  width: 5px;
+  top: 2px;
+  bottom: 2px;
+  right: 2px;
+  height: auto;
+}
+
+/* ========== DEED CARD ========== */
+#deed {
+  display: none;
+  position: fixed;
+  border: none;
+  width: 240px;
+  height: 280px;
+  background-color: white;
+  z-index: 18;
+  user-select: none;
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(0, 0, 0, 0.08);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+#deed td {
+  border: none;
+}
+
+#deed-header {
+  width: 215px;
+  height: 48px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  margin: 12px auto 8px;
+  text-align: center;
+  text-transform: uppercase;
+  font-family: Calibri, Arial;
+}
+
+#deed-name {
+  font-size: 15px;
+  font-weight: bold;
+}
+
+#deed-table {
+  margin: 8px auto;
+  width: 217px;
+  border-spacing: 1px;
+}
+
+#deed-mortgaged {
+  font-family: Calibri, Arial;
+  font-size: 16px;
+  text-align: center;
+}
+
+#deed-mortgaged-name {
+  font-size: 18px;
+  font-weight: bold;
+  text-transform: uppercase;
+  margin: 30px 20px 20px;
+}
+
+#deed-special {
+  font-family: Calibri, Arial;
+  text-align: justify;
+}
+
+#deed-special-name {
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  border-style: solid;
+  border-width: 2px 0px;
+  text-transform: uppercase;
+  margin: 50px 20px 20px;
+}
+
+#deed-special-text {
+  margin: 20px;
+  font-size: 15px;
+}
+
+#deed-special-footer {
+  margin: 0px 20px;
+  width: 195px;
+  position: absolute;
+  bottom: 20px;
+  font-size: 16px;
+}
+
+/* ========== MENU TAB ITEMS ========== */
+.menu-item {
+  padding: 0;
+  border-collapse: collapse;
+  text-align: center;
+  display: table-cell;
+  background-color: transparent;
+  border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  height: 36px;
+  min-width: 80px;
+  max-width: 100px;
+  overflow: hidden;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ========== MISC BOARD ========== */
+.house {
+  width: 25px;
+  height: 19px;
+  vertical-align: middle;
+  float: right;
+}
+
+.hotel {
+  width: 26px;
+  height: 19px;
+  vertical-align: middle;
+  float: right;
+}
+
+.enlarge {
+  width: 150px;
+  height: 200px;
+  display: none;
+  background-color: white;
+  border: 2px solid black;
+  text-align: center;
+  font-size: 12px;
+  font-family: arial, sans-serif;
+  position: fixed;
+  z-index: 15;
+}
+
+.enlarge-color {
+  background: white;
+  width: 100%;
+  height: 40px;
+}
+
+.enlarge-name {
+  font-weight: bold;
+  font-size: 20px;
+  background-color: white;
+  height: 45px;
+}
+
+.enlarge-price {
+  background-color: white;
+  vertical-align: bottom;
+  height: 25px;
+}
+
+.enlarge-token {
+  height: 45px;
+  width: 150px;
+}
+
+/* ========== MONEY BAR ========== */
+.moneybarcell {
+  width: 83px;
+  min-width: 83px;
+}
+
+.moneybararrowcell {
+  background: transparent;
+  width: 30px;
+  border: none;
+  text-align: right;
+  padding: 0;
+}
+
+.money-bar-arrow {
+  height: 30px;
+  width: 30px;
+}
+
+/* ========== STATS ========== */
+.statscellcolor {
+  padding: 0;
+  width: 22px;
+  height: 20px;
+  border: none;
+}
+
+.statscellname {
+  height: 20px;
+  border: none;
+  cursor: default;
+  text-align: left;
+  min-width: 172px;
+}
+
+.statsplayername {
+  font-weight: bold;
+  font-size: 22px;
+}
+
+.statscell {
+  border: 2px solid black;
+  padding: 8px;
+  vertical-align: top;
+  width: 202px;
+  min-width: 115px;
+  border-radius: 8px;
+}
+
+/* ========== TRADE ========== */
+.trade-cell {
+  border: none;
+  border-radius: 3px;
+  height: 26px;
+  vertical-align: middle;
+}
+
+/* ========== BUTTON STYLING ========== */
+input[type='button'] {
+  background: linear-gradient(135deg, #305bc9, #4787ed);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  box-shadow: 0 2px 6px rgba(48, 91, 201, 0.2);
+}
+
+input[type='button']:hover {
+  background: linear-gradient(135deg, #2649a8, #3a72d4);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(48, 91, 201, 0.35);
+}
+
+input[type='button']:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(48, 91, 201, 0.2);
+}
+
+input[type='button']:disabled {
+  background: #a0a0a0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+input[type='button']#resignbutton {
+  background: linear-gradient(135deg, #dc3545, #e55565);
+  box-shadow: 0 2px 6px rgba(220, 53, 69, 0.2);
+}
+
+input[type='button']#resignbutton:hover {
+  background: linear-gradient(135deg, #c82333, #d44050);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.35);
+}
+
+/* ========== MODAL OVERLAY (shared) ========== */
+.modal-overlay {
+  backdrop-filter: blur(4px);
+}
+
+/* ========== RESPONSIVE ========== */
+@media screen and (max-width: 900px) {
+  .board-wrapper {
+    width: 100%;
+  }
+
+  .board-scroll-container {
+    max-height: 70vh;
+  }
+
+  .statscell {
+    min-width: 100px;
+    width: auto;
+    padding: 6px;
+  }
+
+  .statsplayername {
+    font-size: 18px;
+  }
+}
+
+@media screen and (max-width: 700px) {
+  .board-center-logo {
+    font-size: 16px;
+    letter-spacing: 5px;
+  }
+
+  .board-center-panels {
+    flex-direction: column;
+  }
+
+  .board-scroll-container {
+    max-height: 60vh;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  input[type='button'] {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+
+  .board-zoom-controls {
+    top: 6px;
+    right: 6px;
+    padding: 3px;
+  }
+
+  .board-zoom-controls button {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  .board-center-logo {
+    font-size: 14px;
+    letter-spacing: 3px;
+  }
+
+  .statscell {
+    min-width: 80px;
+    padding: 4px;
+    font-size: 10px;
+  }
+
+  .statsplayername {
+    font-size: 14px;
+  }
+}
