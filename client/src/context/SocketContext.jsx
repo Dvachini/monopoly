@@ -35,15 +35,20 @@ const clearSession = () => {
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
   const [connected, setConnected] = useState(false);
-  const [gameId, setGameId] = useState(null);
   const [roomCode, setRoomCode] = useState(null);
   const [roomPlayers, setRoomPlayers] = useState([]);
-  const [isHost, setIsHost] = useState(false);
+  const [hostIndex, setHostIndex] = useState(null);
   const [myPlayerIndex, setMyPlayerIndex] = useState(0);
   const [lobbyError, setLobbyError] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [rejoining, setRejoining] = useState(false);
   const rejoinAttempted = useRef(false);
+  const rejoinTimer = useRef(null);
+  // Another tab took our seat: do not reconnect and fight for it
+  const replaced = useRef(false);
+
+  // The host is whoever the server says, so it follows host hand-over
+  const isHost = hostIndex !== null && hostIndex === myPlayerIndex;
 
   useEffect(() => {
     // In production, connect to same origin. In dev, connect to port 5000.
@@ -61,12 +66,12 @@ export function SocketProvider({ children }) {
     newSocket.on('connect', () => {
       setConnected(true);
 
-      // Attempt rejoin on reconnect
+      // Attempt rejoin on connect/reconnect, in lobby or in game
       const session = loadSession();
       if (
         session &&
         session.roomCode &&
-        session.gameStarted &&
+        session.token &&
         !rejoinAttempted.current
       ) {
         rejoinAttempted.current = true;
@@ -74,17 +79,29 @@ export function SocketProvider({ children }) {
         console.log('Attempting to rejoin room', session.roomCode);
         newSocket.emit('rejoin-room', {
           roomCode: session.roomCode,
-          playerName: session.playerName,
           playerIndex: session.playerIndex,
+          token: session.token,
         });
+        // No answer in time: stop showing the reconnecting screen
+        clearTimeout(rejoinTimer.current);
+        rejoinTimer.current = setTimeout(() => setRejoining(false), 8000);
       }
     });
 
-    newSocket.on('disconnect', () => {
+    newSocket.on('disconnect', (reason) => {
       console.log('Socket disconnected');
       setConnected(false);
       // Allow rejoin attempt on next connect
       rejoinAttempted.current = false;
+      // The server dropped us (e.g. throttle): socket.io will not retry by
+      // itself, so reconnect and let the rejoin flow run
+      if (reason === 'io server disconnect' && !replaced.current) {
+        newSocket.connect();
+      }
+    });
+
+    newSocket.on('replaced', () => {
+      replaced.current = true;
     });
 
     newSocket.on('connect_error', (err) => {
@@ -94,6 +111,7 @@ export function SocketProvider({ children }) {
     setSocket(newSocket);
 
     return () => {
+      clearTimeout(rejoinTimer.current);
       newSocket.close();
     };
   }, []);
@@ -102,42 +120,44 @@ export function SocketProvider({ children }) {
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('room-created', ({ roomCode: code, players, isHost: host }) => {
-      setRoomCode(code);
-      setRoomPlayers(players);
-      setIsHost(host);
-      setMyPlayerIndex(1);
-      setLobbyError('');
-      // Save session for potential reconnection — playerName filled on create
-      const name = players[0]?.name || '';
-      saveSession({
-        roomCode: code,
-        playerName: name,
-        playerIndex: 1,
-        gameStarted: false,
-      });
-    });
-
+    // token is only sent to this socket; keep it in the session, never log it
     socket.on(
-      'room-joined',
-      ({ roomCode: code, players, playerIndex, isHost: host }) => {
+      'room-created',
+      ({ roomCode: code, players, playerIndex, token, hostIndex: host }) => {
         setRoomCode(code);
         setRoomPlayers(players);
-        setIsHost(host);
+        setHostIndex(host);
         setMyPlayerIndex(playerIndex);
         setLobbyError('');
-        const me = players.find((p) => p.index === playerIndex);
         saveSession({
           roomCode: code,
-          playerName: me?.name || '',
           playerIndex,
+          token,
           gameStarted: false,
         });
       },
     );
 
-    socket.on('room-updated', ({ players }) => {
+    socket.on(
+      'room-joined',
+      ({ roomCode: code, players, playerIndex, token, hostIndex: host }) => {
+        setRoomCode(code);
+        setRoomPlayers(players);
+        setHostIndex(host);
+        setMyPlayerIndex(playerIndex);
+        setLobbyError('');
+        saveSession({
+          roomCode: code,
+          playerIndex,
+          token,
+          gameStarted: false,
+        });
+      },
+    );
+
+    socket.on('room-updated', ({ players, hostIndex: host }) => {
       setRoomPlayers(players);
+      if (host !== undefined) setHostIndex(host);
     });
 
     socket.on('join-error', ({ message }) => {
@@ -148,15 +168,25 @@ export function SocketProvider({ children }) {
       setLobbyError(message);
     });
 
-    socket.on('game-started', ({ players }) => {
-      setRoomPlayers(players);
-      setGameStarted(true);
-      // Mark session as in-game so reconnect works
-      const session = loadSession();
-      if (session) {
-        saveSession({ ...session, gameStarted: true });
-      }
-    });
+    // Seats are renumbered 1..N at start: adopt the new numbers
+    socket.on(
+      'game-started',
+      ({ players, hostIndex: host, playerIndex }) => {
+        setRoomPlayers(players);
+        if (host !== undefined) setHostIndex(host);
+        if (playerIndex !== undefined) setMyPlayerIndex(playerIndex);
+        setGameStarted(true);
+        // Mark session as in-game so reconnect works
+        const session = loadSession();
+        if (session) {
+          saveSession({
+            ...session,
+            playerIndex: playerIndex ?? session.playerIndex,
+            gameStarted: true,
+          });
+        }
+      },
+    );
 
     socket.on('player-disconnected', ({ socketId }) => {
       // handled by room-updated
@@ -165,27 +195,38 @@ export function SocketProvider({ children }) {
     // Rejoin handlers
     socket.on(
       'rejoin-success',
-      ({ roomCode: code, players, playerIndex, isHost: host, gameState }) => {
-        console.log('Rejoin successful, restoring game state');
+      ({
+        roomCode: code,
+        players,
+        playerIndex,
+        hostIndex: host,
+        gameState,
+        started,
+      }) => {
+        console.log('Rejoin successful');
+        clearTimeout(rejoinTimer.current);
         setRoomCode(code);
         setRoomPlayers(players);
-        setIsHost(host);
+        if (host !== undefined) setHostIndex(host);
         setMyPlayerIndex(playerIndex);
-        setGameStarted(true);
+        // In the lobby there is no game state yet: stay in the waiting room
+        const inGame = started !== undefined ? started : !!gameState;
+        if (inGame) setGameStarted(true);
         setRejoining(false);
-        // Save updated session
-        const me = players.find((p) => p.index === playerIndex);
+        // Keep the stored token (the server does not send it again)
+        const session = loadSession();
         saveSession({
+          ...session,
           roomCode: code,
-          playerName: me?.name || '',
           playerIndex,
-          gameStarted: true,
+          gameStarted: inGame,
         });
       },
     );
 
     socket.on('rejoin-error', ({ message }) => {
       console.log('Rejoin failed:', message);
+      clearTimeout(rejoinTimer.current);
       setRejoining(false);
       clearSession();
     });
@@ -227,23 +268,9 @@ export function SocketProvider({ children }) {
     }
   };
 
-  const joinGame = (id) => {
-    if (socket) {
-      setGameId(id);
-      socket.emit('join-game', id);
-    }
-  };
-
-  const leaveGame = () => {
-    if (socket && gameId) {
-      socket.emit('leave-game', gameId);
-      setGameId(null);
-    }
-  };
-
   const emit = (event, data) => {
     if (socket) {
-      socket.emit(event, { gameId, ...data });
+      socket.emit(event, data);
     }
   };
 
@@ -262,9 +289,9 @@ export function SocketProvider({ children }) {
   const value = {
     socket,
     connected,
-    gameId,
     roomCode,
     roomPlayers,
+    hostIndex,
     isHost,
     myPlayerIndex,
     lobbyError,
@@ -275,8 +302,6 @@ export function SocketProvider({ children }) {
     createRoom,
     joinRoom,
     startGame,
-    joinGame,
-    leaveGame,
     emit,
     on,
     off,

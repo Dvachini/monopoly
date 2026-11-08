@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import Lobby from '../components/Lobby.jsx';
 import Setup from '../components/Setup.jsx';
 import Board from '../components/Board.jsx';
@@ -14,9 +14,16 @@ function GameScreen() {
   const { status, players } = useContext(GameContext);
   const { clearSession } = useSocket();
 
+  // Game over: forget the saved seat so a refresh does not try to rejoin
+  useEffect(() => {
+    if (status === 'finished') clearSession();
+  }, [status]);
+
   if (status === 'finished') {
-    const winner = players.find((p, i) => i > 0 && p.position >= 0);
-    clearSession();
+    // Winner = the only player still in the game (index 0 is the bank).
+    // The game only ends by resignation, so anything else shows no name.
+    const remaining = players.filter((p, i) => i > 0 && p.position >= 0);
+    const winner = remaining.length === 1 ? remaining[0] : null;
     return (
       <div className='flex flex-col items-center justify-center min-h-[60vh] text-center p-8'>
         <h1 className='text-4xl font-bold mb-4'>🏆 Game Over!</h1>

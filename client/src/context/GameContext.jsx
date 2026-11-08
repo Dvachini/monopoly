@@ -65,8 +65,8 @@ export function GameProvider({ children }) {
     setAlerts((prev) => [...prev, text]);
   }, []);
 
-  const popup = useCallback((html, action, option) => {
-    setPopupData({ html, action, option });
+  const popup = useCallback((message, action, option) => {
+    setPopupData({ message, action, option });
   }, []);
 
   const closePopup = useCallback(() => {

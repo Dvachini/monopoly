@@ -1,51 +1,44 @@
 # Stage 1: Build Stage (client build)
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
-WORKDIR /app
-
-# Install root dependencies
-COPY package*.json ./
-RUN npm install
-
-# Copy client separately and install client dependencies + build
-COPY client ./client
 WORKDIR /app/client
-RUN npm install && npm run build
 
-# Move built files to /app/dist in the builder stage
-RUN mkdir -p /app/dist && mv dist/* /app/dist/
+# Client dependencies (devDeps needed for vite, so no NODE_ENV=production here)
+COPY client/package*.json ./
+RUN npm ci
 
-# Return to root app dir
-WORKDIR /app
+# Client source + build
+COPY client ./
+RUN npm run build
 
 # Stage 2: Production Stage
-FROM node:20-alpine
+FROM node:22-alpine
 
-# Install for alpine
-RUN apk update --no-cache && \
-    apk add --no-cache curl tzdata
+# Install tzdata for alpine
+RUN apk add --no-cache tzdata
 
-# Set timezone data
 ENV TZ=Asia/Kuala_Lumpur
+ENV NODE_ENV=production
 
-# Set working directory
+# /app owned by node, then everything below runs as node
 WORKDIR /app
+RUN chown node:node /app
+USER node
 
 # Install only production dependencies
-COPY package*.json ./
-RUN npm install --omit=dev
+COPY --chown=node:node package*.json ./
+RUN npm ci --omit=dev
 
 # Copy backend source code
-COPY server.js ./
-COPY routes ./routes
-COPY sockets ./sockets
-COPY models ./models
+COPY --chown=node:node server.js ./
+COPY --chown=node:node sockets ./sockets
 
-# Copy built dist files from builder
-COPY --from=builder /app/dist ./dist
+# Copy built client from builder
+COPY --from=builder --chown=node:node /app/client/dist ./dist
 
-# Expose server port
 EXPOSE 5000
 
-# Start the app
-CMD ["npm", "start"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:5000/health || exit 1
+
+CMD ["node", "server.js"]

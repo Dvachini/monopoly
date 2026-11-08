@@ -52,7 +52,8 @@ function Control() {
     setAuctionEndTurnPending,
   } = useContext(GameContext);
 
-  const { socket, myPlayerIndex, roomCode } = useContext(SocketContext);
+  const { socket, myPlayerIndex, roomCode, roomPlayers, isHost } =
+    useContext(SocketContext);
 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [hasRolled, setHasRolled] = useState(false);
@@ -60,6 +61,9 @@ function Control() {
 
   // Track alerts generated during an action to send to other players
   const pendingAlerts = useRef([]);
+
+  // Always points at the latest advanceTurn (defined below the early return)
+  const advanceTurnRef = useRef(null);
 
   // Wrapped addAlert that also tracks for broadcasting
   const gameAlert = (msg) => {
@@ -127,6 +131,18 @@ function Control() {
     socket.on('state-synced', handleSync);
     return () => socket.off('state-synced', handleSync);
   }, [socket]);
+
+  // Skip the turn of a disconnected player after 30s (host client only).
+  // roomPlayers keeps the order Setup used to number the game players.
+  const turnDisconnected = !!(roomPlayers[turn - 1] || {}).disconnected;
+  useEffect(() => {
+    if (!roomCode || !isHost || !turnDisconnected || auctionActive) return;
+    if (status !== 'playing') return;
+    const timer = setTimeout(() => {
+      if (advanceTurnRef.current) advanceTurnRef.current();
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [roomCode, isHost, turn, turnDisconnected, auctionActive, status]);
 
   if (!showControl) return null;
 
@@ -436,6 +452,7 @@ function Control() {
     }
     broadcastState(ps, undefined, nextTurn);
   };
+  advanceTurnRef.current = () => advanceTurn(players);
 
   // ========== BUY PROPERTY ==========
   const handleBuyProperty = () => {
@@ -700,7 +717,7 @@ function Control() {
   // ========== RESIGN ==========
   const handleResign = () => {
     popup(
-      `<p>${currentPlayer.name}, are you sure you want to resign?</p>`,
+      [`${currentPlayer.name}, are you sure you want to resign?`],
       () => {
         const newPlayers = [...players];
         const newSquares = [...squares];

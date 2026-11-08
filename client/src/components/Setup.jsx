@@ -57,7 +57,7 @@ function Setup() {
     roomPlayers,
     roomCode,
     socket,
-    myPlayerIndex,
+    isHost,
     rejoining,
   } = useContext(SocketContext);
 
@@ -165,7 +165,7 @@ function Setup() {
     setShowMoneyBar(true);
 
     // If host, broadcast initial state to all players
-    if (socket && myPlayerIndex === 1) {
+    if (socket && isHost) {
       setTimeout(() => {
         socket.emit('sync-state', {
           gameState: {

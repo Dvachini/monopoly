@@ -69,8 +69,6 @@ function Lobby() {
   // If we're in a room, show the waiting room
   if (roomCode) return <WaitingRoom />;
 
-  const joinUrl = `http://${window.location.hostname}:${window.location.port}?room=${roomCode || ''}`;
-
   return (
     <div className='flex flex-col items-center justify-center min-h-[80vh] p-5'>
       <h1 className='mb-2.5 text-3xl font-bold'>Monopoly</h1>
@@ -116,7 +114,7 @@ function Lobby() {
           <label className='text-sm font-medium'>Your Name:</label>
           <input
             type='text'
-            maxLength={16}
+            maxLength={20}
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
             placeholder='Enter your name'
@@ -137,7 +135,10 @@ function Lobby() {
           <div className='flex gap-2.5 mt-2.5'>
             <button
               onClick={() => {
-                createRoom(playerName || 'Player 1', playerColor.toLowerCase());
+                createRoom(
+                  playerName.trim() || 'Player 1',
+                  playerColor.toLowerCase(),
+                );
               }}
               disabled={!connected}
               className='px-7 py-3 text-base font-bold border-none rounded-lg cursor-pointer text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed'
@@ -170,7 +171,7 @@ function Lobby() {
           <label className='text-sm font-medium'>Your Name:</label>
           <input
             type='text'
-            maxLength={16}
+            maxLength={20}
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
             placeholder='Enter your name'
@@ -193,7 +194,7 @@ function Lobby() {
               onClick={() => {
                 joinRoom(
                   joinCode,
-                  playerName || 'Player',
+                  playerName.trim() || 'Player',
                   playerColor.toLowerCase(),
                 );
               }}
@@ -220,13 +221,14 @@ function WaitingRoom() {
   const {
     roomCode,
     roomPlayers,
+    hostIndex,
     isHost,
     lobbyError,
     startGame,
     myPlayerIndex,
   } = useContext(SocketContext);
 
-  const joinUrl = `http://${window.location.hostname}:${window.location.port}?room=${roomCode}`;
+  const joinUrl = `${window.location.origin}/?room=${roomCode}`;
 
   return (
     <div className='flex flex-col items-center p-5 min-h-[80vh]'>
@@ -255,9 +257,9 @@ function WaitingRoom() {
         <h4 className='mb-2 text-base font-semibold'>
           Players ({roomPlayers.length}/8)
         </h4>
-        {roomPlayers.map((p, i) => (
+        {roomPlayers.map((p) => (
           <div
-            key={i}
+            key={p.index}
             className={`flex items-center gap-2.5 px-3 py-2 mb-1 border border-gray-200 rounded-md ${p.index === myPlayerIndex ? 'bg-green-50' : 'bg-white'}`}
             style={{ borderLeft: `5px solid ${p.color}` }}
           >
@@ -266,12 +268,12 @@ function WaitingRoom() {
               style={{ backgroundColor: p.color }}
             />
             <span className='font-bold'>{p.name}</span>
-            {i === 0 && (
+            {p.index === hostIndex && (
               <span className='text-[11px] text-gray-400 ml-auto'>Host</span>
             )}
             {p.index === myPlayerIndex && (
               <span
-                className={`text-[11px] text-green-600 ${i === 0 ? 'ml-1.5' : 'ml-auto'}`}
+                className={`text-[11px] text-green-600 ${p.index === hostIndex ? 'ml-1.5' : 'ml-auto'}`}
               >
                 You
               </span>

@@ -88,7 +88,7 @@ function Trade() {
     );
 
     popup(
-      `<p>${otherPlayer.name}, do you accept this trade?</p><p>${tradeDesc.join('<br/>')}</p>`,
+      [`${otherPlayer.name}, do you accept this trade?`, tradeDesc],
       () => {
         // Execute trade
         const newPlayers = [...players];
