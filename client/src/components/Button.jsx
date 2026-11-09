@@ -24,12 +24,14 @@ function Button({
             : 'min-h-11 min-w-11 px-5 text-base'
       } ${
         variant === 'primary'
-          ? 'bg-gold text-ink border border-[#b8901a] shadow-(--shadow-btn) hover:bg-gold-hover disabled:bg-[#e7dfd0] disabled:text-[#6b6258] disabled:border-[#cfc3ab] disabled:shadow-none'
+          ? 'bg-gold text-ink border border-(--gold-edge) shadow-(--shadow-btn) hover:bg-gold-hover disabled:bg-[#e7dfd0] disabled:text-[#6b6258] disabled:border-[#cfc3ab] disabled:shadow-none'
           : variant === 'danger'
-            ? 'bg-danger text-white hover:bg-[#991b1b] disabled:bg-[#e7dfd0] disabled:text-[#6b6258]'
+            ? 'bg-danger text-white shadow-(--shadow-btn) hover:bg-[#991b1b] disabled:bg-[#e7dfd0] disabled:text-[#6b6258] disabled:shadow-none'
             : variant === 'ghost'
               ? 'bg-transparent text-current hover:bg-current/10 underline-offset-4 disabled:opacity-60'
-              : 'bg-card text-ink border border-line-strong hover:bg-white disabled:bg-[#e7dfd0] disabled:text-[#6b6258] disabled:border-[#cfc3ab]'
+              : variant === 'outline'
+                ? 'bg-transparent text-paper border border-paper/60 shadow-none hover:bg-paper/10 disabled:opacity-60'
+                : 'bg-card text-ink border border-line-strong shadow-(--shadow-btn) hover:bg-white disabled:bg-[#e7dfd0] disabled:text-[#6b6258] disabled:border-[#cfc3ab] disabled:shadow-none'
       } ${full ? 'w-full' : ''} ${className}`}
       {...rest}
     >

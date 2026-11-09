@@ -194,7 +194,13 @@ function Board() {
               shortName
             )}
           </span>
-          <span className='full'>{name}</span>
+          <span className='full'>
+            {/* soft hyphens: safety net where the browser has no hyphenation dictionary */}
+            {name
+              .replace('Mediterranean', 'Medi\u00ADter\u00ADra\u00ADnean')
+              .replace('Pennsylvania', 'Penn\u00ADsyl\u00ADva\u00ADnia')
+              .replace('Connecticut', 'Con\u00ADnect\u00ADi\u00ADcut')}
+          </span>
         </div>
         {owner && (
           <>
@@ -245,10 +251,7 @@ function Board() {
             +
           </Button>
         </div>
-        <div
-          className='board-scroll'
-          style={zoom > 1 ? { maxHeight: '85dvh' } : undefined}
-        >
+        <div className='board-scroll'>
           <div className='board-sizer' style={{ '--zoom': zoom }}>
             <div className='board' role='group' aria-label='Game board'>
               {topRow.map((i, c) => renderCell(i, c + 1, 1))}

@@ -1,8 +1,10 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import { rollDice, calculateRent } from '../game/monopoly.jsx';
 import Button from './Button.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Control() {
   const {
@@ -59,6 +61,25 @@ function Control() {
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [hasRolled, setHasRolled] = useState(false);
   const [canRollAgain, setCanRollAgain] = useState(false);
+  const [confirmResign, setConfirmResign] = useState(false);
+  const resignDialogRef = useRef(null);
+
+  useDialogFocus(confirmResign, resignDialogRef);
+
+  // Escape cancels the resign confirmation
+  useEffect(() => {
+    if (!confirmResign) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setConfirmResign(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [confirmResign]);
+
+  // Close the confirmation if the turn changes, so it never names the wrong player
+  useEffect(() => {
+    setConfirmResign(false);
+  }, [turn]);
 
   // Track alerts generated during an action to send to other players
   const pendingAlerts = useRef([]);
@@ -717,42 +738,37 @@ function Control() {
 
   // ========== RESIGN ==========
   const handleResign = () => {
-    popup(
-      [`${currentPlayer.name}, are you sure you want to resign?`],
-      () => {
-        const newPlayers = [...players];
-        const newSquares = [...squares];
-        for (let i = 0; i < 40; i++) {
-          if (newSquares[i].owner === turn) {
-            newSquares[i] = {
-              ...newSquares[i],
-              owner: 0,
-              house: 0,
-              mortgage: false,
-            };
-          }
-        }
-        newPlayers[turn] = { ...newPlayers[turn], money: 0, position: -1 };
-        setPlayers(newPlayers);
-        setSquares(newSquares);
-        gameAlert(`${currentPlayer.name} has resigned.`);
+    setConfirmResign(false);
+    const newPlayers = [...players];
+    const newSquares = [...squares];
+    for (let i = 0; i < 40; i++) {
+      if (newSquares[i].owner === turn) {
+        newSquares[i] = {
+          ...newSquares[i],
+          owner: 0,
+          house: 0,
+          mortgage: false,
+        };
+      }
+    }
+    newPlayers[turn] = { ...newPlayers[turn], money: 0, position: -1 };
+    setPlayers(newPlayers);
+    setSquares(newSquares);
+    gameAlert(`${currentPlayer.name} has resigned.`);
 
-        const activePlayers = newPlayers.filter(
-          (p, i) => i > 0 && p.position >= 0,
-        );
-        if (activePlayers.length === 1) {
-          gameAlert(`${activePlayers[0].name} wins the game!`);
-          broadcastState(newPlayers, newSquares, undefined, {
-            status: 'finished',
-          });
-          setStatus('finished');
-        } else {
-          broadcastState(newPlayers, newSquares);
-          handleEndTurn(newPlayers);
-        }
-      },
-      'yes/no',
+    const activePlayers = newPlayers.filter(
+      (p, i) => i > 0 && p.position >= 0,
     );
+    if (activePlayers.length === 1) {
+      gameAlert(`${activePlayers[0].name} wins the game!`);
+      broadcastState(newPlayers, newSquares, undefined, {
+        status: 'finished',
+      });
+      setStatus('finished');
+    } else {
+      broadcastState(newPlayers, newSquares);
+      handleEndTurn(newPlayers);
+    }
   };
 
   // ========== BUTTON LOGIC ==========
@@ -813,7 +829,7 @@ function Control() {
                   <div
                     role='log'
                     aria-live='polite'
-                    className='w-full h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-mono text-xs bg-card text-ink overflow-y-auto box-border'
+                    className='w-full h-18 lg:h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-sans text-(--t-sm) leading-[1.4] bg-card text-ink overflow-y-auto box-border'
                   >
                     {alerts.map((a, i) => (
                       <div key={i}>{a}</div>
@@ -970,22 +986,6 @@ function Control() {
               )}
             </td>
             <td className='align-top border-none'>
-              <div
-                className='text-[13px] font-bold font-sans border-2 rounded-md m-1.5 px-2.5 py-1.5 min-w-22.5 bg-card max-sm:min-w-17.5 max-sm:text-xs'
-                style={{
-                  borderColor: currentPlayer ? currentPlayer.color : 'blue',
-                }}
-              >
-                <div>
-                  <span className='bg-card'>
-                    {currentPlayer ? currentPlayer.name : 'Player'}
-                  </span>
-                  :
-                </div>
-                <div>
-                  <span>${currentPlayer ? currentPlayer.money : 1500}</span>
-                </div>
-              </div>
               <div>
                 {diceRolled && (
                   <>
@@ -1063,11 +1063,53 @@ function Control() {
           id='resignbutton'
           className='ml-4 text-danger!'
           title='If you cannot pay your debt then you must resign from the game.'
-          onClick={handleResign}
+          aria-haspopup='dialog'
+          onClick={() => setConfirmResign(true)}
         >
           Resign
         </Button>
       </div>
+      {confirmResign &&
+        createPortal(
+        <>
+          <div
+            className='fixed inset-0 bg-black/50 z-30'
+            onClick={() => setConfirmResign(false)}
+          />
+          <div
+            ref={resignDialogRef}
+            tabIndex={-1}
+            role='alertdialog'
+            aria-modal='true'
+            aria-labelledby='resign-title'
+            aria-describedby='resign-desc'
+            className='fixed inset-0 z-31 flex items-center justify-center p-4 select-none pointer-events-none'
+          >
+            <div className='modal pointer-events-auto w-full max-w-sm min-w-0 p-5 text-center'>
+              <h2
+                id='resign-title'
+                className='font-display text-(--t-xl) font-bold leading-tight'
+              >
+                Resign from the game?
+              </h2>
+              <p id='resign-desc' className='mt-2 text-base'>
+                {currentPlayer ? `${currentPlayer.name}, you` : 'You'} will
+                leave the game and cannot rejoin. Your cash is lost and your
+                properties go back to the bank. This cannot be undone.
+              </p>
+              <div className='mt-4 flex gap-3'>
+                <Button full onClick={() => setConfirmResign(false)}>
+                  Cancel
+                </Button>
+                <Button variant='danger' full onClick={handleResign}>
+                  Resign
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
     </div>
   );
 }

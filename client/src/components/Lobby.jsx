@@ -53,17 +53,16 @@ function Lobby() {
   if (roomCode) return <WaitingRoom />;
 
   return (
-    <div className='flex flex-col items-center justify-center min-h-[80dvh] w-full p-3 sm:p-5'>
-      <h1 className='mb-2 font-display text-(--t-3xl) font-bold leading-tight'>
-        Monopoly
-      </h1>
-      <p
-        role='status'
-        className={`mb-5 inline-flex items-center gap-2 rounded-full bg-card px-3 py-1 text-sm font-semibold ${connected ? 'text-success' : 'text-danger'}`}
-      >
+    <div className='flex min-h-[calc(100dvh-2rem)] w-full flex-col max-sm:min-h-[calc(100dvh-1rem)] items-center justify-center p-3 pb-[8dvh] sm:p-5'>
+      <div aria-hidden='true' className='mb-3 flex items-end gap-3'>
+        <div className='die die-five -rotate-8' />
+        <div className='die die-two rotate-10' />
+      </div>
+      <h1 className='wordmark mb-3'>Monopoly</h1>
+      <p role='status' className='conn-pill mb-6'>
         <span
           aria-hidden='true'
-          className={`h-2.5 w-2.5 rounded-full ${connected ? 'bg-success' : 'border-2 border-danger'}`}
+          className={`conn-dot ${connected ? '' : 'conn-dot-off motion-safe:animate-pulse'}`}
         />
         {connected ? 'Connected to server' : 'Connecting to server...'}
       </p>
@@ -88,9 +87,8 @@ function Lobby() {
             Join Game
           </Button>
           <Button
-            variant='ghost'
+            variant='outline'
             full
-            className='text-paper'
             onClick={() => setStatus('setup')}
           >
             Play locally (same device)
@@ -294,7 +292,7 @@ function Rejoining() {
   } catch (e) {}
 
   return (
-    <div className='flex min-h-[80dvh] w-full flex-col items-center justify-center p-3 sm:p-5'>
+    <div className='flex min-h-[calc(100dvh-2rem)] w-full flex-col max-sm:min-h-[calc(100dvh-1rem)] items-center justify-center p-3 pb-[8dvh] sm:p-5'>
       <div
         role='status'
         className='card flex w-full max-w-sm flex-col items-center gap-3 p-6 text-center'

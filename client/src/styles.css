@@ -153,12 +153,29 @@ body {
 }
 
 /* ========== GAME LAYOUT ========== */
+/* --chrome = App padding + zoom row; change only this if the header changes */
 .game-layout {
+  --vh: 100vh;
+  --chrome: 88px;
+  --side: 360px;
+  --gap: 12px;
   display: grid;
-  gap: 12px;
+  gap: var(--gap);
   width: 100%;
   padding: 0 max(0px, env(safe-area-inset-left)) 0
     max(0px, env(safe-area-inset-right));
+}
+
+@supports (height: 100dvh) {
+  .game-layout {
+    --vh: 100dvh;
+  }
+}
+
+@media (max-width: 639px) {
+  .game-layout {
+    --chrome: 72px;
+  }
 }
 
 .side-panel {
@@ -170,33 +187,40 @@ body {
 
 @media (min-width: 1024px) {
   .game-layout {
-    grid-template-columns: minmax(0, 1fr) 360px;
+    /* 48px = App padding (32) + scrollbar allowance (16) */
+    --fit: min(
+      100vw - var(--side) - var(--gap) - 48px,
+      var(--vh) - var(--chrome),
+      1000px
+    );
+    grid-template-columns: minmax(0, var(--fit)) var(--side);
+    justify-content: center;
     align-items: start;
-    max-width: 1360px;
-    margin-inline: auto;
   }
 
   .side-panel {
     position: sticky;
     top: 8px;
-    max-height: calc(100dvh - 16px);
+    max-height: calc(var(--vh) - 16px);
     overflow: auto;
   }
 }
 
 /* ========== BOARD ========== */
+/* phones / stacked: fit width and height */
 .board-stage {
-  --board: 100%;
+  --board: min(100%, var(--vh) - var(--chrome), 1000px);
   min-width: 0;
 }
 
 @media (min-width: 1024px) {
   .board-stage {
-    --board: min(100%, max(760px, 100dvh - 24px), 900px);
+    --board: 100%;
   }
 }
 
 .board-scroll {
+  max-height: calc(var(--vh) - var(--chrome));
   overflow: auto;
   border-radius: var(--radius-md);
   max-width: 100%;
@@ -206,6 +230,7 @@ body {
 
 .board-sizer {
   width: calc(var(--board) * var(--zoom, 1));
+  margin-inline: auto;
   container-type: inline-size;
 }
 
@@ -361,7 +386,7 @@ body {
 
 .cell-name .short {
   display: block;
-  font-size: var(--t-2xs);
+  font-size: clamp(0.625rem, 1.9cqi, 0.8125rem);
   white-space: pre-line;
 }
 
@@ -376,16 +401,17 @@ body {
   font-weight: 700;
 }
 
-@container (min-width: 760px) {
+@container (min-width: 900px) {
   .cell-name .short {
     display: none;
   }
 
   .cell-name .full {
     display: -webkit-box;
-    font-size: clamp(0.6875rem, 1.45cqi, 0.8125rem);
+    font-size: clamp(0.625rem, 1.15cqi, 0.75rem);
     hyphens: auto;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
@@ -581,6 +607,42 @@ body {
   transition: transform 0.15s ease;
 }
 
+/* corners: label and tokens in normal flow, never overlaid */
+.cell-corner {
+  display: flex;
+  flex-direction: column;
+}
+
+.cell-corner .cell-name {
+  position: static;
+  inset: auto;
+  flex: none;
+  padding: 2px 1px 0;
+}
+
+/* narrow boards: smaller corner label leaves room for all 8 tokens */
+.cell-corner .cell-name .short {
+  font-size: clamp(0.5625rem, 2.2cqi, var(--t-xs));
+  line-height: 1.05;
+}
+
+.cell-corner .cell-position-holder {
+  position: static;
+  flex: 1;
+  min-height: 0;
+  align-content: flex-start;
+  justify-content: center;
+  padding: 1px;
+  overflow: hidden;
+}
+
+.cell-corner .cell-position {
+  --token: clamp(9px, 2.4cqi, 16px);
+  font-size: max(8px, calc(var(--token) * 0.6));
+  margin: 0 -3px -3px 0;
+  box-shadow: 0 0 0 1px #fff;
+}
+
 /* ========== BOARD ZOOM CONTROLS ========== */
 .board-zoom-controls {
   display: flex;
@@ -672,4 +734,79 @@ body {
   border-radius: 3px;
   height: 26px;
   vertical-align: middle;
+}
+
+/* ========== LOBBY ========== */
+.wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #fff;
+  /* ~8.6em wide incl. padding with wide serif fallbacks: 8.5vw stays under 340px */
+  font-size: clamp(1.5rem, 8.5vw, 3rem);
+  line-height: 1.1;
+  max-width: 100%;
+  overflow-wrap: normal;
+  letter-spacing: 0.14em;
+  /* extra left padding offsets the trailing letter-spacing */
+  padding: 0.15em 0.5em 0.15em 0.64em;
+  background: var(--danger);
+  border: 3px solid var(--gold);
+  border-radius: 6px;
+  box-shadow:
+    0 0 0 2px var(--danger),
+    0 6px 0 rgb(0 0 0 / 0.25);
+  text-shadow: 0 2px 0 rgb(0 0 0 / 0.35);
+}
+
+.conn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--on-felt);
+  background: rgb(0 0 0 / 0.28);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 9999px;
+  padding: 0.2rem 0.7rem;
+}
+
+.conn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgb(74 222 128 / 0.25);
+}
+
+.conn-dot-off {
+  background: transparent;
+  border: 2px solid #fca5a5;
+  box-shadow: none;
+}
+
+.die {
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
+  background-color: var(--card);
+  box-shadow:
+    0 3px 0 rgb(0 0 0 / 0.3),
+    inset 0 0 0 2px var(--ink);
+}
+
+.die-five {
+  background-image:
+    radial-gradient(circle at 25% 25%, var(--ink) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 75% 25%, var(--ink) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 25% 75%, var(--ink) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 75% 75%, var(--ink) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 50% 50%, var(--ink) 0 3.5px, transparent 4px);
+}
+
+.die-two {
+  background-image:
+    radial-gradient(circle at 25% 25%, var(--ink) 0 3.5px, transparent 4px),
+    radial-gradient(circle at 75% 75%, var(--ink) 0 3.5px, transparent 4px);
 }
