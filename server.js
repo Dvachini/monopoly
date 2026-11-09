@@ -130,9 +130,11 @@ if (require.main === module) {
   });
 
   // PROCESS ----
-  // Bad input must not kill the server
+  // Handlers are wrapped in try/catch, so an uncaught exception is a real bug:
+  // log the stack and exit, docker restarts a clean process (restart: unless-stopped)
   process.on('uncaughtException', (err) => {
-    console.log(`uncaughtException: ${err.message}`);
+    console.log(`uncaughtException: ${err.stack || err.message}`);
+    process.exit(1);
   });
   process.on('unhandledRejection', (reason) => {
     console.log(`unhandledRejection: ${reason}`);

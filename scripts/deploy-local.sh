@@ -21,14 +21,17 @@ fi
 
 docker build -t monopoly:local .
 # --force-recreate: with --no-build compose can report "Running" and keep the old image
-"${COMPOSE[@]}" up -d --no-build --force-recreate
-
 ok=0
-for _ in $(seq 1 40); do
-  code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${HOST_PORT}/health" || true)"
-  if [ "$code" = "200" ]; then ok=1; break; fi
-  sleep 1
-done
+# A failed "up" must still reach the rollback below (set -e would skip it)
+if "${COMPOSE[@]}" up -d --no-build --force-recreate; then
+  for _ in $(seq 1 40); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${HOST_PORT}/health" || true)"
+    if [ "$code" = "200" ]; then ok=1; break; fi
+    sleep 1
+  done
+else
+  echo "compose up failed" >&2
+fi
 
 # The running container must use the image just built, not a stale one
 if [ "$ok" = 1 ] && [ "$(docker inspect -f '{{.Image}}' monopoly)" != "$(docker image inspect -f '{{.Id}}' monopoly:local)" ]; then
@@ -48,7 +51,12 @@ docker logs --tail 50 monopoly || true
 if docker image inspect monopoly:previous >/dev/null 2>&1; then
   docker tag monopoly:previous monopoly:local
   "${COMPOSE[@]}" up -d --no-build --force-recreate
-  echo "ROLLED BACK"
+  for _ in $(seq 1 40); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:3500/health" || true)"
+    if [ "$code" = "200" ]; then echo "ROLLED BACK (previous image is healthy)"; exit 1; fi
+    sleep 1
+  done
+  echo "ROLLED BACK but /health is still failing, check docker logs monopoly" >&2
 else
   echo "no monopoly:previous image to roll back to" >&2
 fi
