@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Server tests
+        run: |
+          npm ci
+          npm test
+
+      - name: Client build
+        run: |
+          cd client
+          npm ci
+          npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t monopoly:ci .
+
+      - name: Smoke test container
+        run: |
+          c=$(docker run -d -p 127.0.0.1:5056:5000 monopoly:ci)
+          trap 'docker stop "$c" >/dev/null; docker rm "$c" >/dev/null' EXIT
+
+          ok=0
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5056/health || true)
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then
+            echo "/health did not return 200 within 30s"
+            docker logs "$c"
+            exit 1
+          fi
+
+          uid=$(docker exec "$c" id -u)
+          echo "container uid: $uid"
+          if [ "$uid" = "0" ]; then
+            echo "container runs as root"
+            docker logs "$c"
+            exit 1
+          fi

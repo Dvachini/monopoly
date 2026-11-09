@@ -1,0 +1,13 @@
+name: monopoly
+
+services:
+  monopoly:
+    container_name: monopoly
+    build: ..
+    image: monopoly:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3500:5000"
+    environment:
+      NODE_ENV: production
+      ALLOWED_ORIGINS: https://mono.dvachini.cc
