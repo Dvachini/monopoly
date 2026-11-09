@@ -1,91 +1,135 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
+import Button from './Button.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Deed() {
   const { deedIndex, setDeedIndex, squares } = useContext(GameContext);
 
-  if (deedIndex < 0 || !squares[deedIndex]) return null;
+  const open = deedIndex >= 0 && Boolean(squares[deedIndex]);
+  const dialogRef = useRef(null);
+
+  useDialogFocus(open, dialogRef);
+
+  // Escape closes the preview
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setDeedIndex(-1);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, setDeedIndex]);
+
+  if (!open) return null;
 
   const sq = squares[deedIndex];
 
   return (
-    <div
-      id='deed'
-      style={{ display: 'block' }}
-      onMouseLeave={() => setDeedIndex(-1)}
-    >
-      {sq.mortgage ? (
-        <div id='deed-mortgaged' style={{ display: 'block' }}>
-          <div id='deed-mortgaged-name'>{sq.name}</div>
-          <p>&bull;</p>
-          <div>MORTGAGED</div>
-          <div>for ${sq.price / 2}</div>
-          <p>&bull;</p>
+    <>
+      <div className='deed-backdrop' onClick={() => setDeedIndex(-1)} />
+      <div id='deed' ref={dialogRef} tabIndex={-1} role='dialog' aria-label={sq.name}>
+        {sq.groupNumber >= 3 && (
           <div
-            style={{ fontStyle: 'italic', fontSize: '13px', margin: '10px' }}
-          >
-            Card must be turned this side up if property is mortgaged
-          </div>
-        </div>
-      ) : sq.groupNumber >= 3 ? (
-        <div id='deed-normal' style={{ display: 'block' }}>
-          <div id='deed-header' style={{ backgroundColor: sq.color }}>
-            <div style={{ margin: '5px', fontSize: '11px' }}>
-              T I T L E&nbsp;&nbsp;D E E D
+            className='deed-band'
+            role='presentation'
+            style={{ backgroundColor: sq.color }}
+          />
+        )}
+        <div className='p-4'>
+          <div className='flex items-start justify-between gap-3'>
+            <div>
+              <div className='deed-title'>{sq.name}</div>
+              <div className='text-sm text-ink-muted'>
+                {sq.groupNumber === 1
+                  ? 'Railroad'
+                  : sq.groupNumber === 2
+                    ? 'Utility'
+                    : [
+                        'Brown',
+                        'Light blue',
+                        'Pink',
+                        'Orange',
+                        'Red',
+                        'Yellow',
+                        'Green',
+                        'Dark blue',
+                      ][sq.groupNumber - 3]}
+                {sq.groupNumber >= 3 && ' property'}
+              </div>
             </div>
-            <div id='deed-name'>{sq.name}</div>
+            <Button
+              variant='ghost'
+              size='sm'
+              aria-label='Close'
+              onClick={() => setDeedIndex(-1)}
+            >
+              ×
+            </Button>
           </div>
-          <table id='deed-table'>
-            <tbody>
-              <tr>
-                <td colSpan='2'>RENT&nbsp;${sq.baserent}.</td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'left' }}>With 1 House</td>
-                <td style={{ textAlign: 'right' }}>
-                  $&nbsp;&nbsp;&nbsp;{sq.rent1}.
-                </td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'left' }}>With 2 Houses</td>
-                <td style={{ textAlign: 'right' }}>{sq.rent2}.</td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'left' }}>With 3 Houses</td>
-                <td style={{ textAlign: 'right' }}>{sq.rent3}.</td>
-              </tr>
-              <tr>
-                <td style={{ textAlign: 'left' }}>With 4 Houses</td>
-                <td style={{ textAlign: 'right' }}>{sq.rent4}.</td>
-              </tr>
-              <tr>
-                <td colSpan='2'>
-                  <div style={{ marginBottom: '8px' }}>
-                    With HOTEL ${sq.rent5}.
-                  </div>
-                  <div>Mortgage Value ${sq.price / 2}.</div>
-                  <div>Houses cost ${sq.houseprice}. each</div>
-                  <div>Hotels, ${sq.houseprice}. plus 4 houses</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+
+          {sq.mortgage ? (
+            <div className='mt-3 text-sm'>
+              <p className='font-bold text-danger'>MORTGAGED</p>
+              <p>Mortgage value ${sq.price / 2}</p>
+              <p className='mt-2 text-ink-muted'>
+                Card must be turned this side up if property is mortgaged
+              </p>
+            </div>
+          ) : sq.groupNumber >= 3 ? (
+            <dl className='deed-rows mt-3 text-sm'>
+              <div>
+                <dt>Rent</dt>
+                <dd>${sq.baserent}</dd>
+              </div>
+              <div>
+                <dt>With 1 house</dt>
+                <dd>${sq.rent1}</dd>
+              </div>
+              <div>
+                <dt>With 2 houses</dt>
+                <dd>${sq.rent2}</dd>
+              </div>
+              <div>
+                <dt>With 3 houses</dt>
+                <dd>${sq.rent3}</dd>
+              </div>
+              <div>
+                <dt>With 4 houses</dt>
+                <dd>${sq.rent4}</dd>
+              </div>
+              <div>
+                <dt>With hotel</dt>
+                <dd>${sq.rent5}</dd>
+              </div>
+              <div>
+                <dt>Mortgage value</dt>
+                <dd>${sq.price / 2}</dd>
+              </div>
+              <div>
+                <dt>Houses cost</dt>
+                <dd>${sq.houseprice} each</dd>
+              </div>
+              <div>
+                <dt>Hotel costs</dt>
+                <dd>${sq.houseprice} plus 4 houses</dd>
+              </div>
+            </dl>
+          ) : (
+            <div className='mt-3 text-sm'>
+              <p>
+                {sq.groupNumber === 2
+                  ? 'If one "Utility" is owned rent is 4 times amount shown on dice. If both "Utilities" are owned rent is 10 times amount shown on dice.'
+                  : 'Rent $25. If 2 Railroads are owned $50. If 3 are owned $100. If 4 are owned $200.'}
+              </p>
+              <p className='mt-2 font-semibold'>
+                Mortgage value ${sq.price / 2}
+              </p>
+            </div>
+          )}
         </div>
-      ) : sq.groupNumber > 0 ? (
-        <div id='deed-special' style={{ display: 'block' }}>
-          <div id='deed-special-name'>{sq.name}</div>
-          <div id='deed-special-text'>
-            {sq.groupNumber === 2
-              ? 'If one "Utility" is owned rent is 4 times amount shown on dice. If both "Utilities" are owned rent is 10 times amount shown on dice.'
-              : 'Rent $25. If 2 Railroads are owned $50. If 3 are owned $100. If 4 are owned $200.'}
-          </div>
-          <div id='deed-special-footer'>
-            Mortgage Value{' '}
-            <span style={{ float: 'right' }}>${sq.price / 2}.</span>
-          </div>
-        </div>
-      ) : null}
-    </div>
+      </div>
+    </>
   );
 }
 

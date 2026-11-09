@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import { rollDice, calculateRent } from '../game/monopoly.jsx';
+import Button from './Button.jsx';
 
 function Control() {
   const {
@@ -52,7 +53,7 @@ function Control() {
     setAuctionEndTurnPending,
   } = useContext(GameContext);
 
-  const { socket, myPlayerIndex, roomCode, roomPlayers, isHost } =
+  const { socket, myPlayerIndex, roomCode, roomPlayers, isHost, connected } =
     useContext(SocketContext);
 
   const [selectedProperty, setSelectedProperty] = useState(null);
@@ -770,72 +771,50 @@ function Control() {
 
   // ========== RENDER ==========
   return (
-    <div className='z-9 rounded-xl p-2 bg-white border border-gray-200 shadow-sm flex-1 min-w-0 overflow-auto'>
+    <div className='card p-2 sm:p-3 min-w-0'>
       <table className='w-full'>
         <tbody>
           <tr>
             <td className='text-left align-top border-none'>
-              <div className='w-full h-8.5'>
-                <table
-                  className='p-0 text-left font-sans text-white font-bold text-[13px] border-none rounded-t-lg h-8.5 w-full m-0 bg-linear-to-br from-blue-700 to-blue-500 overflow-hidden'
-                  cellSpacing='0'
+              <div className='flex'>
+                <div role='group' aria-label='Game panel' className='flex flex-1'>
+                  <button
+                    type='button'
+                    aria-pressed={activeTab === 'buy'}
+                    title='View alerts and buy the property you landed on.'
+                    onClick={() => setActiveTab('buy')}
+                    className={`min-h-11 flex-1 rounded-tl-lg border-b-[3px] px-3 text-sm font-semibold ${activeTab === 'buy' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
+                  >
+                    Buy
+                  </button>
+                  <button
+                    type='button'
+                    aria-pressed={activeTab === 'manage'}
+                    title='View, mortgage, and improve your property.'
+                    onClick={() => setActiveTab('manage')}
+                    className={`min-h-11 flex-1 border-b-[3px] px-3 text-sm font-semibold ${activeTab === 'manage' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
+                  >
+                    Manage
+                  </button>
+                </div>
+                <button
+                  type='button'
+                  title='Exchange property with other players.'
+                  onClick={() => setShowTrade(true)}
+                  disabled={Boolean(roomCode) && !connected}
+                  className='min-h-11 flex-1 rounded-tr-lg border-b-[3px] border-transparent bg-felt-deep px-3 text-sm font-semibold text-paper disabled:opacity-60'
                 >
-                  <tbody>
-                    <tr>
-                      <td
-                        className='menu-item'
-                        onClick={() => setActiveTab('buy')}
-                        style={{
-                          fontWeight: activeTab === 'buy' ? 'bold' : 'normal',
-                        }}
-                      >
-                        <a
-                          href='#'
-                          title='View alerts and buy the property you landed on.'
-                          onClick={(e) => e.preventDefault()}
-                          className='text-white no-underline block h-full w-full pt-2'
-                        >
-                          Buy
-                        </a>
-                      </td>
-                      <td
-                        className='menu-item'
-                        onClick={() => setActiveTab('manage')}
-                        style={{
-                          fontWeight:
-                            activeTab === 'manage' ? 'bold' : 'normal',
-                        }}
-                      >
-                        <a
-                          href='#'
-                          title='View, mortgage, and improve your property.'
-                          onClick={(e) => e.preventDefault()}
-                          className='text-white no-underline block h-full w-full pt-2'
-                        >
-                          Manage
-                        </a>
-                      </td>
-                      <td
-                        className='menu-item'
-                        onClick={() => setShowTrade(true)}
-                      >
-                        <a
-                          href='#'
-                          title='Exchange property with other players.'
-                          onClick={(e) => e.preventDefault()}
-                          className='text-white no-underline block h-full w-full pt-2'
-                        >
-                          Trade
-                        </a>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                  Trade
+                </button>
               </div>
 
               {activeTab === 'buy' && (
                 <div>
-                  <div className='w-full h-20 m-0 px-1.5 py-1 border border-gray-300 rounded-b-md font-mono text-xs bg-gray-50 overflow-y-auto box-border'>
+                  <div
+                    role='log'
+                    aria-live='polite'
+                    className='w-full h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-mono text-xs bg-card text-ink overflow-y-auto box-border'
+                  >
                     {alerts.map((a, i) => (
                       <div key={i}>{a}</div>
                     ))}
@@ -843,30 +822,32 @@ function Control() {
 
                   {/* Jail options */}
                   {playerInJail && !hasRolled && (
-                    <div className='block px-2 py-1.5 border border-gray-300 border-t-0 rounded-b-md w-full m-0 text-center bg-white box-border'>
+                    <div className='block px-2 py-1.5 border border-line border-t-0 rounded-b-md w-full m-0 text-center bg-card box-border'>
                       <div>You are in jail.</div>
-                      <input
-                        type='button'
-                        value='Pay $50 fine'
+                      <Button
+                        size='sm'
                         onClick={handlePayJailFine}
                         title='Pay $50 to get out of jail.'
-                      />
+                      >
+                        Pay $50 fine
+                      </Button>
                       {hasJailCard && (
-                        <input
-                          type='button'
-                          value='Use Card'
+                        <Button
+                          size='sm'
                           onClick={handleUseJailCard}
                           title='Use Get Out of Jail Free card.'
                           className='ml-1.5'
-                        />
+                        >
+                          Use Card
+                        </Button>
                       )}
                       {currentPlayer.jailroll === 0 && (
-                        <div className='text-xs text-gray-500'>
+                        <div className='text-xs text-ink-muted'>
                           First turn in jail.
                         </div>
                       )}
                       {currentPlayer.jailroll === 1 && (
-                        <div className='text-xs text-gray-500'>
+                        <div className='text-xs text-ink-muted'>
                           Second turn in jail.
                         </div>
                       )}
@@ -881,25 +862,36 @@ function Control() {
 
                   {/* Landed info + buy/auction */}
                   {landed && (
-                    <div className='block px-2 py-1.5 border border-gray-300 border-t-0 rounded-b-md w-full m-0 text-center bg-white box-border'>
+                    <div className='block px-2 py-1.5 border border-line border-t-0 rounded-b-md w-full m-0 text-center bg-card box-border'>
                       {landed}
                       {canBuyProperty && (
                         <div className='mt-1.5'>
-                          <input
-                            type='button'
+                          <Button
+                            variant='primary'
+                            size='sm'
                             onClick={handleBuyProperty}
-                            value={`Buy ($${squares[currentPlayer.position].price})`}
                             title={`Buy ${squares[currentPlayer.position].name}`}
-                            disabled={auctionActive || !isMyTurn}
-                          />
-                          <input
-                            type='button'
+                            disabled={
+                              auctionActive ||
+                              !isMyTurn ||
+                              (roomCode && !connected)
+                            }
+                          >
+                            {`Buy ($${squares[currentPlayer.position].price})`}
+                          </Button>
+                          <Button
+                            size='sm'
                             onClick={handleStartAuction}
-                            value='Auction'
                             title='Put this property up for auction'
                             className='ml-1.5'
-                            disabled={auctionActive || !isMyTurn}
-                          />
+                            disabled={
+                              auctionActive ||
+                              !isMyTurn ||
+                              (roomCode && !connected)
+                            }
+                          >
+                            Auction
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -908,42 +900,50 @@ function Control() {
               )}
 
               {activeTab === 'manage' && (
-                <div className='block w-full border border-gray-300 rounded-md box-border'>
-                  <div className='border-b border-gray-200 bg-white block align-middle p-1.5 text-center min-h-7 gap-1.5'>
-                    <input
-                      type='button'
-                      value={
-                        selectedProperty !== null &&
-                        squares[selectedProperty] &&
-                        squares[selectedProperty].house === 4
-                          ? `Buy hotel ($${squares[selectedProperty].houseprice})`
-                          : `Buy house${selectedProperty !== null && squares[selectedProperty] ? ` ($${squares[selectedProperty].houseprice})` : ''}`
-                      }
+                <div className='block w-full border border-line rounded-md box-border'>
+                  <div className='border-b border-line bg-card p-1.5 text-center min-h-7 flex flex-wrap justify-center gap-1.5'>
+                    <Button
+                      size='sm'
                       onClick={handleBuyHouse}
-                      disabled={selectedProperty === null}
-                    />
-                    <input
-                      type='button'
-                      value={
-                        selectedProperty !== null &&
-                        squares[selectedProperty] &&
-                        squares[selectedProperty].mortgage
-                          ? `Unmortgage ($${Math.round(squares[selectedProperty].price * 0.55)})`
-                          : `Mortgage${selectedProperty !== null && squares[selectedProperty] ? ` ($${Math.round(squares[selectedProperty].price * 0.5)})` : ''}`
+                      disabled={
+                        selectedProperty === null ||
+                        (Boolean(roomCode) && !connected)
                       }
+                    >
+                      {selectedProperty !== null &&
+                      squares[selectedProperty] &&
+                      squares[selectedProperty].house === 4
+                        ? `Buy hotel ($${squares[selectedProperty].houseprice})`
+                        : `Buy house${selectedProperty !== null && squares[selectedProperty] ? ` ($${squares[selectedProperty].houseprice})` : ''}`}
+                    </Button>
+                    <Button
+                      size='sm'
                       onClick={handleMortgage}
-                      disabled={selectedProperty === null}
-                    />
-                    <input
-                      type='button'
-                      value={`Sell house${selectedProperty !== null && squares[selectedProperty] ? ` ($${Math.round(squares[selectedProperty].houseprice * 0.5)})` : ''}`}
+                      disabled={
+                        selectedProperty === null ||
+                        (Boolean(roomCode) && !connected)
+                      }
+                    >
+                      {selectedProperty !== null &&
+                      squares[selectedProperty] &&
+                      squares[selectedProperty].mortgage
+                        ? `Unmortgage ($${Math.round(squares[selectedProperty].price * 0.55)})`
+                        : `Mortgage${selectedProperty !== null && squares[selectedProperty] ? ` ($${Math.round(squares[selectedProperty].price * 0.5)})` : ''}`}
+                    </Button>
+                    <Button
+                      size='sm'
                       onClick={handleSellHouse}
-                      disabled={selectedProperty === null}
-                    />
+                      disabled={
+                        selectedProperty === null ||
+                        (Boolean(roomCode) && !connected)
+                      }
+                    >
+                      {`Sell house${selectedProperty !== null && squares[selectedProperty] ? ` ($${Math.round(squares[selectedProperty].houseprice * 0.5)})` : ''}`}
+                    </Button>
                   </div>
-                  <div className='py-1 bg-white text-center max-h-97.5 overflow-y-auto'>
+                  <div className='py-1 bg-card text-center max-h-97.5 overflow-y-auto'>
                     {ownedProperties.length === 0 ? (
-                      <div className='p-1.5 text-gray-400'>
+                      <div className='p-1.5 text-ink-muted'>
                         {currentPlayer
                           ? `${currentPlayer.name}, you don't have any properties.`
                           : 'No properties owned.'}
@@ -971,13 +971,13 @@ function Control() {
             </td>
             <td className='align-top border-none'>
               <div
-                className='text-[13px] font-bold font-sans border-2 rounded-md m-1.5 px-2.5 py-1.5 min-w-22.5 bg-linear-to-br from-blue-50 to-white max-sm:min-w-17.5 max-sm:text-xs'
+                className='text-[13px] font-bold font-sans border-2 rounded-md m-1.5 px-2.5 py-1.5 min-w-22.5 bg-card max-sm:min-w-17.5 max-sm:text-xs'
                 style={{
                   borderColor: currentPlayer ? currentPlayer.color : 'blue',
                 }}
               >
                 <div>
-                  <span className='bg-white'>
+                  <span className='bg-card'>
                     {currentPlayer ? currentPlayer.name : 'Player'}
                   </span>
                   :
@@ -1014,49 +1014,60 @@ function Control() {
               </div>
             </td>
           </tr>
-          <tr>
-            <td colSpan='2' className='border-none'>
-              <div className='pt-2'>
-                {roomCode && !isMyTurn && (
-                  <div className='text-gray-400 italic mb-1.5'>
-                    Waiting for{' '}
-                    {currentPlayer ? currentPlayer.name : 'opponent'}...
-                  </div>
-                )}
-                {showRollButton && (
-                  <input
-                    type='button'
-                    title={
-                      canRollAgain
-                        ? 'You threw doubles. Roll again.'
-                        : 'Roll the dice and move your token accordingly.'
-                    }
-                    value={canRollAgain ? 'Roll Again' : 'Roll Dice'}
-                    onClick={handleRollDice}
-                    disabled={auctionActive || !isMyTurn}
-                  />
-                )}
-                {showEndTurnButton && (
-                  <input
-                    type='button'
-                    title='End turn and advance to the next player.'
-                    value='End Turn'
-                    onClick={() => handleEndTurn()}
-                    disabled={!isMyTurn}
-                  />
-                )}
-                <input
-                  type='button'
-                  id='resignbutton'
-                  title='If you cannot pay your debt then you must resign from the game.'
-                  value='Resign'
-                  onClick={handleResign}
-                />
-              </div>
-            </td>
-          </tr>
         </tbody>
       </table>
+      <div className='sticky bottom-0 z-5 -mx-2 mt-2 flex flex-wrap items-center justify-center gap-2 border-t border-line bg-paper px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-3 sm:px-3'>
+        {roomCode && !connected ? (
+          <p className='w-full text-center text-sm font-semibold text-danger'>
+            Offline. Actions are paused until you reconnect.
+          </p>
+        ) : (
+          roomCode &&
+          !isMyTurn && (
+            <p className='w-full text-center text-sm text-ink-muted'>
+              Waiting for {currentPlayer ? currentPlayer.name : 'opponent'}...
+            </p>
+          )
+        )}
+        {showRollButton && (
+          <Button
+            variant='primary'
+            size='lg'
+            title={
+              canRollAgain
+                ? 'You threw doubles. Roll again.'
+                : 'Roll the dice and move your token accordingly.'
+            }
+            onClick={handleRollDice}
+            disabled={
+              auctionActive || !isMyTurn || (roomCode && !connected)
+            }
+          >
+            {canRollAgain ? 'Roll Again' : 'Roll Dice'}
+          </Button>
+        )}
+        {showEndTurnButton && (
+          <Button
+            variant='primary'
+            size='lg'
+            title='End turn and advance to the next player.'
+            onClick={() => handleEndTurn()}
+            disabled={!isMyTurn || (roomCode && !connected)}
+          >
+            End Turn
+          </Button>
+        )}
+        <Button
+          variant='ghost'
+          size='sm'
+          id='resignbutton'
+          className='ml-4 text-danger!'
+          title='If you cannot pay your debt then you must resign from the game.'
+          onClick={handleResign}
+        >
+          Resign
+        </Button>
+      </div>
     </div>
   );
 }

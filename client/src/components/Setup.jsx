@@ -1,4 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
+import Button from './Button.jsx';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import { createGameEngine } from '../game/monopoly.jsx';
@@ -287,12 +288,14 @@ function Setup() {
       ))}
 
       <div className='my-5'>
-        <input
-          type='button'
-          value='Start Game'
+        <Button
+          variant='primary'
+          size='lg'
           onClick={handleStart}
           title='Begin playing.'
-        />
+        >
+          Start Game
+        </Button>
       </div>
 
       <div>

@@ -1,9 +1,25 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
+import Button from './Button.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Stats() {
   const { showStats, setShowStats, players, pcount, squares } =
     useContext(GameContext);
+
+  const dialogRef = useRef(null);
+
+  useDialogFocus(showStats, dialogRef);
+
+  // Escape closes the stats
+  useEffect(() => {
+    if (!showStats) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowStats(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showStats, setShowStats]);
 
   if (!showStats) return null;
 
@@ -13,16 +29,24 @@ function Stats() {
         className='fixed inset-0 bg-black/50 backdrop-blur-sm z-16'
         onClick={() => setShowStats(false)}
       />
-      <div className='fixed inset-0 flex items-center justify-center z-17 select-none p-4 pointer-events-none'>
-        <div className='w-full max-w-3xl min-w-0 max-h-[80vh] overflow-y-auto font-sans text-sm p-5 text-center wrap-break-word leading-normal border border-gray-200 rounded-2xl bg-white relative select-none shadow-2xl pointer-events-auto'>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role='dialog'
+        aria-modal='true'
+        aria-label='Stats'
+        className='fixed inset-0 flex items-center justify-center z-17 select-none p-4 pointer-events-none'
+      >
+        <div className='w-full max-w-3xl min-w-0 max-h-[80vh] overflow-y-auto font-sans text-sm p-5 text-center wrap-break-word leading-normal border border-line rounded-2xl bg-card text-ink relative select-none shadow-2xl pointer-events-auto'>
           <div className='relative'>
-            <img
-              className='absolute -top-3 -right-3 w-7.5 h-7.5 border-none cursor-pointer overflow-visible z-17 bg-white rounded-full shadow-md'
-              src='/images/close.png'
-              title='Close'
-              alt='x'
+            <Button
+              size='sm'
+              aria-label='Close'
+              className='absolute -top-3 -right-3 z-17 rounded-full'
               onClick={() => setShowStats(false)}
-            />
+            >
+              ×
+            </Button>
             <div className='overflow-hidden min-h-17.5'>
               <table className='mx-auto'>
                 <tbody>

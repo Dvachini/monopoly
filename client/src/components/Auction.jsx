@@ -1,6 +1,8 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
+import Button from './Button.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Auction() {
   const {
@@ -31,11 +33,15 @@ function Auction() {
     setAuctionEndTurnPending,
   } = useContext(GameContext);
 
-  const { socket, myPlayerIndex, roomCode } = useContext(SocketContext);
+  const { socket, myPlayerIndex, roomCode, connected } =
+    useContext(SocketContext);
 
   const [bidAmount, setBidAmount] = useState('');
   // Track consecutive passes — auction ends when passCount reaches auctionPlayers.length
   const [passCount, setPassCount] = useState(0);
+  const dialogRef = useRef(null);
+
+  useDialogFocus(auctionActive && auctionProperty !== null, dialogRef);
 
   // Broadcast auction state to other players
   const broadcastAuction = (data) => {
@@ -241,18 +247,18 @@ function Auction() {
 
   return (
     <>
-      <div className='fixed inset-0 bg-black/50 backdrop-blur-sm z-900' />
-      <div className='fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white border border-gray-200 rounded-2xl p-6 z-901 min-w-80 text-center shadow-2xl max-sm:w-[90%] max-sm:min-w-0 max-sm:max-w-87.5 max-sm:p-4'>
+      <div className='fixed inset-0 modal-overlay bg-black/55 z-900' />
+      <div ref={dialogRef} tabIndex={-1} role='dialog' aria-modal='true' aria-label='Auction' className='modal fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 z-901 min-w-80 text-center max-sm:w-[90%] max-sm:min-w-0 max-sm:max-w-87.5 max-sm:p-4'>
         <h3 className='m-0 mb-2.5 text-lg font-semibold'>Auction</h3>
         <div
-          className='p-2.5 mb-2.5 bg-gray-50 rounded'
+          className='p-2.5 mb-2.5 bg-card rounded'
           style={{
             borderTop:
               sq.color !== '#FFFFFF' ? `6px solid ${sq.color}` : 'none',
           }}
         >
           <div className='font-bold text-base'>{sq.name}</div>
-          <div className='text-gray-500'>List price: {sq.pricetext}</div>
+          <div className='text-ink-muted'>List price: {sq.pricetext}</div>
         </div>
 
         <div className='mb-2.5'>
@@ -262,7 +268,7 @@ function Auction() {
               <span>
                 {' '}
                 by{' '}
-                <span style={{ color: players[auctionBidder]?.color }}>
+                <span className='font-semibold'>
                   {players[auctionBidder]?.name}
                 </span>
               </span>
@@ -271,18 +277,15 @@ function Auction() {
         </div>
 
         <div
-          className='p-2.5 mb-2.5 bg-indigo-50 rounded'
+          className='p-2.5 mb-2.5 bg-card rounded'
           style={{
             borderLeft: `4px solid ${currentBidderPlayer?.color || 'gray'}`,
           }}
         >
-          <div
-            className='font-bold'
-            style={{ color: currentBidderPlayer?.color }}
-          >
+          <div className='font-bold'>
             {currentBidderPlayer?.name}'s turn to bid
           </div>
-          <div className='text-[13px] text-gray-500'>
+          <div className='text-[13px] text-ink-muted'>
             Money: ${currentBidderPlayer?.money}
           </div>
         </div>
@@ -291,35 +294,37 @@ function Auction() {
           <span>$</span>
           <input
             type='number'
+            aria-label='Bid amount'
             value={bidAmount}
             onChange={(e) => setBidAmount(e.target.value)}
             placeholder={`Min $${auctionBid + 1}`}
-            className='w-20 mr-2 p-1 border border-gray-300 rounded'
+            className='w-24 mr-2 min-h-11 px-2 text-base border border-line-strong bg-card text-ink rounded-md'
             min={auctionBid + 1}
             disabled={!isMyAuctionTurn}
           />
-          <input
-            type='button'
-            value='Bid'
+          <Button
+            variant='primary'
             onClick={handleBid}
             className='mr-1.5'
-            disabled={!isMyAuctionTurn}
-          />
-          <input
-            type='button'
-            value='Pass'
+            disabled={!isMyAuctionTurn || (roomCode && !connected)}
+          >
+            Bid
+          </Button>
+          <Button
             onClick={handlePass}
-            disabled={!isMyAuctionTurn}
-          />
+            disabled={!isMyAuctionTurn || (roomCode && !connected)}
+          >
+            Pass
+          </Button>
         </div>
 
         {roomCode && !isMyAuctionTurn && (
-          <div className='text-gray-400 italic text-[13px] mb-2'>
+          <div className='text-ink-muted italic text-[13px] mb-2'>
             Waiting for {currentBidderPlayer?.name} to bid...
           </div>
         )}
 
-        <div className='text-xs text-gray-400'>
+        <div className='text-xs text-ink-muted'>
           {auctionPlayers.length} player{auctionPlayers.length !== 1 ? 's' : ''}{' '}
           in auction
           {auctionBid > 0 && passCount > 0 && (

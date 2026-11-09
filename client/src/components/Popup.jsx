@@ -1,8 +1,13 @@
-import React, { useContext } from 'react';
+import React, { useContext, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
+import Button from './Button.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Popup() {
   const { popupData, closePopup } = useContext(GameContext);
+  const dialogRef = useRef(null);
+
+  useDialogFocus(Boolean(popupData), dialogRef);
 
   if (!popupData) return null;
 
@@ -26,11 +31,18 @@ function Popup() {
   return (
     <>
       <div
-        className='fixed inset-0 bg-black/50 backdrop-blur-sm z-10'
+        className='modal-overlay fixed inset-0 bg-black/55 z-10'
         onClick={closePopup}
       />
-      <div className='fixed inset-0 flex items-center justify-center z-13 select-none p-4 pointer-events-none'>
-        <div className='w-full max-w-sm min-w-0 font-sans text-sm p-5 text-center wrap-break-word leading-normal border border-gray-200 rounded-2xl bg-white z-13 select-none shadow-2xl pointer-events-auto'>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role='dialog'
+        aria-modal='true'
+        aria-label='Message'
+        className='fixed inset-0 flex items-center justify-center z-13 select-none p-4 pointer-events-none'
+      >
+        <div className='modal w-full max-w-sm min-w-0 text-base p-5 text-center wrap-break-word leading-normal z-13 select-none pointer-events-auto'>
           <div className='relative'>
             <div className='overflow-x-auto'>
               {/* message: array = one paragraph per item (nested array = lines
@@ -59,12 +71,16 @@ function Popup() {
             </div>
             {opt === 'yes/no' ? (
               <div className='mt-3 flex gap-2 justify-center'>
-                <input type='button' value='Yes' onClick={handleYes} />
-                <input type='button' value='No' onClick={handleNo} />
+                <Button variant='primary' onClick={handleYes}>
+                  Yes
+                </Button>
+                <Button onClick={handleNo}>No</Button>
               </div>
             ) : opt !== 'blank' ? (
               <div className='mt-3'>
-                <input type='button' value='OK' onClick={handleOk} />
+                <Button variant='primary' onClick={handleOk}>
+                  OK
+                </Button>
               </div>
             ) : null}
           </div>

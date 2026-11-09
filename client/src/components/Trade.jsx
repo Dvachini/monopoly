@@ -1,5 +1,7 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
+import Button from './Button.jsx';
 import GameContext from '../context/GameContext.jsx';
+import useDialogFocus from './useDialogFocus.jsx';
 
 function Trade() {
   const {
@@ -13,7 +15,9 @@ function Trade() {
     turn,
     addAlert,
     popup,
+    popupData,
   } = useContext(GameContext);
+  const dialogRef = useRef(null);
   const [rightPlayer, setRightPlayer] = useState(() => {
     for (let i = 1; i <= 8; i++) {
       if (i !== turn) return i;
@@ -26,6 +30,26 @@ function Trade() {
   const [rightProperties, setRightProperties] = useState([]);
   const [leftJailCard, setLeftJailCard] = useState(false);
   const [rightJailCard, setRightJailCard] = useState(false);
+
+  useDialogFocus(showTrade, dialogRef);
+
+  // Escape cancels the trade (unless the accept/decline popup is on top)
+  useEffect(() => {
+    if (!showTrade || popupData) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        setShowTrade(false);
+        setLeftMoney(0);
+        setRightMoney(0);
+        setLeftProperties([]);
+        setRightProperties([]);
+        setLeftJailCard(false);
+        setRightJailCard(false);
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showTrade, popupData]);
 
   if (!showTrade) return null;
 
@@ -172,13 +196,20 @@ function Trade() {
   return (
     <div className='fixed inset-0 z-14 flex items-start justify-center pt-4 pb-4'>
       <div
-        className='fixed inset-0 bg-black/30 backdrop-blur-sm'
+        className='modal-overlay fixed inset-0 bg-black/55'
         onClick={() => {
           setShowTrade(false);
           resetTrade();
         }}
       />
-      <div className='relative w-[92%] max-w-xl bg-white rounded-2xl p-4 shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto'>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role='dialog'
+        aria-modal='true'
+        aria-label='Trade'
+        className='modal relative w-[92%] max-w-xl p-4 max-h-[90dvh] overflow-y-auto'
+      >
         <table className='w-full' style={{ borderSpacing: '3px' }}>
           <tbody>
             <tr>
@@ -190,6 +221,8 @@ function Trade() {
               <td className='trade-cell w-1/2'>
                 <div className='text-[13px] font-bold'>
                   <select
+                    aria-label='Trade partner'
+                    className='min-h-11 lg:min-h-0'
                     value={rightPlayer}
                     onChange={(e) => {
                       setRightPlayer(parseInt(e.target.value, 10));
@@ -219,8 +252,9 @@ function Trade() {
                   min='0'
                   value={leftMoney}
                   onChange={(e) => setLeftMoney(e.target.value)}
+                  aria-label='Money you give'
                   title='Enter amount to give to the other player.'
-                  className='w-20'
+                  className='w-20 min-h-11 lg:min-h-0'
                 />
               </td>
               <td className='trade-cell'>
@@ -230,15 +264,16 @@ function Trade() {
                   min='0'
                   value={rightMoney}
                   onChange={(e) => setRightMoney(e.target.value)}
+                  aria-label='Money you receive'
                   title='Enter amount to receive from the other player.'
-                  className='w-20'
+                  className='w-20 min-h-11 lg:min-h-0'
                 />
               </td>
             </tr>
             <tr>
               <td className='trade-cell align-top'>
                 {leftOwned.length === 0 ? (
-                  <div className='text-gray-400 text-xs'>
+                  <div className='text-ink-muted text-xs'>
                     No tradeable properties
                   </div>
                 ) : (
@@ -277,7 +312,7 @@ function Trade() {
               </td>
               <td className='trade-cell align-top'>
                 {rightOwned.length === 0 ? (
-                  <div className='text-gray-400 text-xs'>
+                  <div className='text-ink-muted text-xs'>
                     No tradeable properties
                   </div>
                 ) : (
@@ -317,23 +352,24 @@ function Trade() {
             </tr>
             <tr>
               <td colSpan='2' className='trade-cell'>
-                <input
-                  type='button'
+                <Button
+                  variant='primary'
                   id='proposetradebutton'
-                  value='Propose Trade'
                   onClick={handlePropose}
                   title='Exchange the money and properties that are checked above.'
-                />
-                <input
-                  type='button'
+                >
+                  Propose Trade
+                </Button>{' '}
+                <Button
                   id='canceltradebutton'
-                  value='Cancel Trade'
                   onClick={() => {
                     setShowTrade(false);
                     resetTrade();
                   }}
                   title='Cancel the trade.'
-                />
+                >
+                  Cancel Trade
+                </Button>
               </td>
             </tr>
           </tbody>
