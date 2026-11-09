@@ -20,7 +20,8 @@ if docker image inspect monopoly:local >/dev/null 2>&1; then
 fi
 
 docker build -t monopoly:local .
-"${COMPOSE[@]}" up -d --no-build
+# --force-recreate: with --no-build compose can report "Running" and keep the old image
+"${COMPOSE[@]}" up -d --no-build --force-recreate
 
 ok=0
 for _ in $(seq 1 40); do
@@ -28,6 +29,12 @@ for _ in $(seq 1 40); do
   if [ "$code" = "200" ]; then ok=1; break; fi
   sleep 1
 done
+
+# The running container must use the image just built, not a stale one
+if [ "$ok" = 1 ] && [ "$(docker inspect -f '{{.Image}}' monopoly)" != "$(docker image inspect -f '{{.Id}}' monopoly:local)" ]; then
+  echo "container is not running the freshly built image" >&2
+  ok=0
+fi
 
 if [ "$ok" = 1 ]; then
   echo "image: $(docker image inspect -f '{{.Id}}' monopoly:local)"
