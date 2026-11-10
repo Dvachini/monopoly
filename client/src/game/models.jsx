@@ -46,11 +46,11 @@ export function Card(text, action) {
   this.action = action;
 }
 
-export function Player(name, color) {
+export function Player(name, color, startingMoney = 1500) {
   this.name = name;
   this.color = color;
   this.position = 0;
-  this.money = 1500;
+  this.money = startingMoney;
   this.creditor = -1;
   this.jail = false;
   this.jailroll = 0;

@@ -1,5 +1,6 @@
 const { timingSafeEqual } = require('crypto');
 const {
+  STARTING_MONEY_OPTIONS,
   isPlainObject,
   sanitizeName,
   normalizeColor,
@@ -11,6 +12,11 @@ const {
 } = require('./validate');
 
 const MAX_PLAYERS = 8;
+// Names nobody may take: they read like system messages in chat
+const RESERVED_NAMES = ['system', 'bank', 'server'];
+
+// Comparison key for names: fullwidth/compat forms fold to plain, any case
+const foldName = (name) => name.normalize('NFKC').toLowerCase();
 
 module.exports = function (io, opts = {}) {
   // In-memory room store (one per app instance)
@@ -33,6 +39,9 @@ module.exports = function (io, opts = {}) {
   const maxRoomsPerIp =
     opts.maxRoomsPerIp || Number(process.env.MAX_ROOMS_PER_IP) || 5;
   const socketsPerIp = new Map();
+  // Per-player rename and per-room starting-cash change windows
+  const renameThrottleMs = opts.renameThrottleMs ?? 3000;
+  const moneyThrottleMs = opts.moneyThrottleMs ?? 1000;
 
   // Safe view of the players: no socketId, no token
   const publicPlayers = (room) =>
@@ -162,6 +171,12 @@ module.exports = function (io, opts = {}) {
         return;
       }
 
+      const chosen = sanitizeName(playerName, null);
+      if (chosen && RESERVED_NAMES.includes(foldName(chosen))) {
+        socket.emit('join-error', { message: 'That name is not allowed.' });
+        return;
+      }
+
       let roomCode = makeRoomCode();
       while (rooms.has(roomCode)) {
         roomCode = makeRoomCode();
@@ -170,7 +185,7 @@ module.exports = function (io, opts = {}) {
       const player = {
         socketId: socket.id,
         token: makeToken(),
-        name: sanitizeName(playerName, 'Player 1'),
+        name: chosen || 'Player 1',
         color: normalizeColor(playerColor) || 'yellow',
         index: 1,
         disconnected: false,
@@ -183,6 +198,7 @@ module.exports = function (io, opts = {}) {
         started: false,
         gameState: null,
         turn: 0,
+        startingMoney: 1500,
         lastActive: Date.now(),
       };
 
@@ -200,6 +216,7 @@ module.exports = function (io, opts = {}) {
         players: publicPlayers(room),
         hostIndex: room.hostIndex,
         isHost: true,
+        startingMoney: room.startingMoney,
       });
     });
 
@@ -228,11 +245,28 @@ module.exports = function (io, opts = {}) {
         return;
       }
 
+      const chosen = sanitizeName(playerName, null);
+      if (chosen && RESERVED_NAMES.includes(foldName(chosen))) {
+        socket.emit('join-error', { message: 'That name is not allowed.' });
+        return;
+      }
+      if (chosen && room.players.some((p) => foldName(p.name) === foldName(chosen))) {
+        socket.emit('join-error', { message: 'That name is already taken.' });
+        return;
+      }
+
       const index = freeIndex(room);
+      // No usable name sent: default Player N, skipping numbers already used
+      let defaultNumber = index;
+      while (
+        room.players.some((p) => foldName(p.name) === `player ${defaultNumber}`)
+      ) {
+        defaultNumber += 1;
+      }
       const player = {
         socketId: socket.id,
         token: makeToken(),
-        name: sanitizeName(playerName, `Player ${index}`),
+        name: chosen || `Player ${defaultNumber}`,
         color,
         index,
         disconnected: false,
@@ -261,6 +295,100 @@ module.exports = function (io, opts = {}) {
         players: publicPlayers(room),
         hostIndex: room.hostIndex,
         isHost: false,
+        startingMoney: room.startingMoney,
+      });
+    });
+
+    // Peek at a room before joining: taken colours and flags, no names/tokens
+    on('room-info', ({ roomCode }) => {
+      const code =
+        typeof roomCode === 'string' ? roomCode.toUpperCase().trim() : '';
+      const room = rooms.get(code);
+      if (!room) {
+        socket.emit('join-error', { message: 'Room not found.' });
+        return;
+      }
+      socket.emit('room-info', {
+        takenColors: room.players.map((p) => p.color),
+        started: room.started,
+        full: room.players.length >= MAX_PLAYERS,
+      });
+    });
+
+    // Change own name: seat comes from the socket, never from the payload
+    on('rename', ({ name }) => {
+      const room = rooms.get(socket.roomCode);
+      if (!room) return;
+      const player = room.players.find((p) => p.socketId === socket.id);
+      if (!player) return;
+
+      const now = Date.now();
+      if (now - (player.lastRenameAt || 0) < renameThrottleMs) {
+        socket.emit('rename-error', { message: 'Slow down, try again in a few seconds.' });
+        return;
+      }
+      // Any attempt that gets past the throttle uses up the window
+      player.lastRenameAt = now;
+      const clean = sanitizeName(name, null);
+      if (!clean) {
+        socket.emit('rename-error', {
+          message: 'Name must be 1-20 letters, numbers or spaces.',
+        });
+        return;
+      }
+      if (clean === player.name) return;
+      if (RESERVED_NAMES.includes(foldName(clean))) {
+        socket.emit('rename-error', { message: 'That name is not allowed.' });
+        return;
+      }
+      if (
+        room.players.some(
+          (p) => p !== player && foldName(p.name) === foldName(clean),
+        )
+      ) {
+        socket.emit('rename-error', { message: 'That name is already taken.' });
+        return;
+      }
+
+      const from = player.name;
+      player.name = clean;
+      socket.playerName = clean;
+      if (room.started && room.gameState && Array.isArray(room.gameState.players)) {
+        if (isPlainObject(room.gameState.players[player.index])) {
+          room.gameState.players[player.index].name = clean;
+        }
+      }
+      touch(room);
+      io.to(room.code).emit('room-updated', {
+        players: publicPlayers(room),
+        hostIndex: room.hostIndex,
+        renamed: { index: player.index, from, to: clean },
+      });
+    });
+
+    // Host picks the starting cash before the game starts
+    on('set-starting-money', ({ amount }) => {
+      const room = rooms.get(socket.roomCode);
+      if (!room || room.started) return;
+      if (room.hostIndex !== socket.playerIndex) return;
+
+      const now = Date.now();
+      if (now - (room.lastMoneyAt || 0) < moneyThrottleMs) {
+        socket.emit('money-error', { message: 'Slow down.' });
+        return;
+      }
+      if (!STARTING_MONEY_OPTIONS.includes(amount)) {
+        socket.emit('money-error', { message: 'Starting cash not allowed.' });
+        return;
+      }
+
+      room.lastMoneyAt = now;
+      room.startingMoney = amount;
+      touch(room);
+      io.to(room.code).emit('room-updated', {
+        players: publicPlayers(room),
+        hostIndex: room.hostIndex,
+        startingMoney: room.startingMoney,
       });
     });
 
@@ -299,6 +427,7 @@ module.exports = function (io, opts = {}) {
             players: publicPlayers(room),
             hostIndex: room.hostIndex,
             playerIndex: p.index,
+            startingMoney: room.startingMoney,
           });
         });
       },
@@ -367,6 +496,7 @@ module.exports = function (io, opts = {}) {
         hostIndex: room.hostIndex,
         isHost: room.hostIndex === playerIndex,
         started: room.started,
+        startingMoney: room.startingMoney,
         gameState: room.gameState,
       });
 
@@ -407,6 +537,14 @@ module.exports = function (io, opts = {}) {
         return;
       }
 
+      // Names belong to the seats: a host sync must not revert a rename
+      if (Array.isArray(gameState.players)) {
+        room.players.forEach((p) => {
+          if (isPlainObject(gameState.players[p.index])) {
+            gameState.players[p.index].name = p.name;
+          }
+        });
+      }
       room.gameState = gameState;
       if (gameState.turn !== undefined) room.turn = gameState.turn;
       touch(room);

@@ -101,9 +101,14 @@ function Board() {
   };
 
   const getPlayerPositions = (cellIndex) => {
-    return players
-      .filter((p, i) => i > 0 && p.position === cellIndex && !p.jail)
-      .map((p) => (
+    const there = players.filter(
+      (p, i) => i > 0 && p.position === cellIndex && !p.jail,
+    );
+    // Non-corner tiles are small: show 3 tokens and a +N chip past 4
+    const crowded = cellIndex % 10 !== 0 && there.length > 4;
+    const shown = crowded ? there.slice(0, 3) : there;
+    return [
+      ...shown.map((p) => (
         <div
           key={p.index}
           className='cell-position disc'
@@ -112,7 +117,20 @@ function Board() {
         >
           <span className='disc-num'>{p.index}</span>
         </div>
-      ));
+      )),
+      crowded && (
+        <div
+          key='more'
+          className='cell-position-more'
+          title={there
+            .slice(3)
+            .map((p) => p.name)
+            .join(', ')}
+        >
+          +{there.length - 3}
+        </div>
+      ),
+    ];
   };
 
   const renderCell = (index, col, row) => {
@@ -209,7 +227,10 @@ function Board() {
               style={{ backgroundColor: owner.color }}
             />
             <span
-              className='cell-owner-badge disc'
+              className='cell-owner-badge'
+              role='img'
+              aria-label={`owned by ${owner.name}`}
+              title={`Owned by ${owner.name}`}
               style={{ backgroundColor: owner.color }}
             >
               <span className='disc-num'>{owner.index}</span>

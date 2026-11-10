@@ -107,8 +107,15 @@ function Auction() {
   // In multiplayer, only the current auction bidder can act
   const isMyAuctionTurn = !roomCode || myPlayerIndex === currentBidderIndex;
 
+  // Bid is valid when it is a whole number from the min bid up to the bidder's cash
+  const bidError =
+    String(parseInt(bidAmount, 10)) !== bidAmount.trim() ||
+    parseInt(bidAmount, 10) < auctionBid + 1 ||
+    parseInt(bidAmount, 10) > (currentBidderPlayer?.money || 0);
+
   const handleBid = () => {
     const amount = parseInt(bidAmount, 10);
+    if (!isMyAuctionTurn || String(amount) !== bidAmount.trim()) return;
     if (isNaN(amount) || amount <= auctionBid) {
       addAlert(`Bid must be higher than $${auctionBid}.`);
       return;
@@ -286,27 +293,36 @@ function Auction() {
             {currentBidderPlayer?.name}'s turn to bid
           </div>
           <div className='text-[13px] text-ink-muted'>
-            Money: ${currentBidderPlayer?.money}
+            Cash: ${currentBidderPlayer?.money} &middot; Min bid: $
+            {auctionBid + 1}
           </div>
         </div>
 
-        <div className='mb-2.5'>
-          <span>$</span>
+        <div className='mb-2.5 flex items-center justify-center gap-1.5'>
+          <span aria-hidden='true'>$</span>
           <input
             type='number'
+            inputMode='numeric'
+            step={1}
             aria-label='Bid amount'
+            aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
             value={bidAmount}
             onChange={(e) => setBidAmount(e.target.value)}
             placeholder={`Min $${auctionBid + 1}`}
-            className='w-24 mr-2 min-h-11 px-2 text-base border border-line-strong bg-card text-ink rounded-md'
+            className='w-28 min-h-11 px-2 text-base border border-line-strong bg-card text-ink rounded-md'
             min={auctionBid + 1}
+            max={currentBidderPlayer?.money}
             disabled={!isMyAuctionTurn}
           />
           <Button
             variant='primary'
             onClick={handleBid}
-            className='mr-1.5'
-            disabled={!isMyAuctionTurn || (roomCode && !connected)}
+            disabled={
+              !isMyAuctionTurn ||
+              (roomCode && !connected) ||
+              bidError
+            }
+            aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
           >
             Bid
           </Button>
@@ -318,9 +334,33 @@ function Auction() {
           </Button>
         </div>
 
+        {isMyAuctionTurn && (
+          <div id='bid-hint' className='text-ink-muted text-[13px] mb-2'>
+            {(currentBidderPlayer?.money || 0) < auctionBid + 1
+              ? `You need more than $${auctionBid} to bid; your cash is $${currentBidderPlayer?.money || 0}. You can pass.`
+              : `Bid must be between $${auctionBid + 1} and your cash $${currentBidderPlayer?.money || 0}.`}
+          </div>
+        )}
+
         {roomCode && !isMyAuctionTurn && (
           <div className='text-ink-muted italic text-[13px] mb-2'>
             Waiting for {currentBidderPlayer?.name} to bid...
+          </div>
+        )}
+
+        {passCount > 0 && (
+          <div className='text-sm text-ink-muted mb-1'>
+            Passed:{' '}
+            {Array.from({ length: passCount }, (_, k) => {
+              const who =
+                players[
+                  auctionPlayers[
+                    (auctionTurn - 1 - k + auctionPlayers.length * 2) %
+                      auctionPlayers.length
+                  ]
+                ];
+              return who ? who.name : '';
+            }).join(', ')}
           </div>
         )}
 

@@ -508,14 +508,35 @@ body {
   width: 4px;
 }
 
+/* owner flag: square with a thick dark border, unlike the round tokens */
 .cell-owner-badge {
   position: absolute;
   z-index: 4;
-  width: 14px;
-  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 15px;
+  height: 15px;
   font-size: 9px;
-  border-width: 1px;
-  box-shadow: none;
+  border: 2px solid #1c1917;
+  border-radius: 2px;
+}
+
+/* +N chip when too many tokens share a tile */
+.cell-position-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--token, 14px);
+  padding: 0 3px;
+  border: 1.5px solid #1c1917;
+  border-radius: 9999px;
+  background: #fff;
+  color: #1c1917;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .cell-top .cell-owner-badge {

@@ -63,6 +63,9 @@ function Control() {
   const [canRollAgain, setCanRollAgain] = useState(false);
   const [confirmResign, setConfirmResign] = useState(false);
   const resignDialogRef = useRef(null);
+  const logRef = useRef(null);
+  const logStuck = useRef(true);
+  const lastEndTurnAt = useRef(0);
 
   useDialogFocus(confirmResign, resignDialogRef);
 
@@ -165,6 +168,17 @@ function Control() {
     }, 30000);
     return () => clearTimeout(timer);
   }, [roomCode, isHost, turn, turnDisconnected, auctionActive, status]);
+
+  // The log remounts on tab change: start pinned to the bottom again
+  useEffect(() => {
+    logStuck.current = true;
+  }, [activeTab]);
+
+  // Game log: follow new entries unless the player scrolled up to read
+  useEffect(() => {
+    const el = logRef.current;
+    if (el && logStuck.current) el.scrollTop = el.scrollHeight;
+  }, [alerts, activeTab]);
 
   if (!showControl) return null;
 
@@ -396,6 +410,11 @@ function Control() {
 
   // ========== END TURN ==========
   const handleEndTurn = (currentPlayers) => {
+    // Ignore while an auction is open, and double presses within 500ms
+    if (auctionActive) return;
+    if (Date.now() - lastEndTurnAt.current < 500) return;
+    lastEndTurnAt.current = Date.now();
+
     const ps = currentPlayers || players;
     const cp = ps[turn];
 
@@ -739,6 +758,9 @@ function Control() {
   // ========== RESIGN ==========
   const handleResign = () => {
     setConfirmResign(false);
+    // An auction may have opened while the dialog was up: resigning now would
+    // leave the turn stuck
+    if (auctionActive) return;
     const newPlayers = [...players];
     const newSquares = [...squares];
     for (let i = 0; i < 40; i++) {
@@ -806,18 +828,29 @@ function Control() {
                   <button
                     type='button'
                     aria-pressed={activeTab === 'manage'}
-                    title='View, mortgage, and improve your property.'
+                    title={
+                      auctionActive
+                        ? 'Finish the auction first'
+                        : 'View, mortgage, and improve your property.'
+                    }
                     onClick={() => setActiveTab('manage')}
-                    className={`min-h-11 flex-1 border-b-[3px] px-3 text-sm font-semibold ${activeTab === 'manage' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
+                    disabled={auctionActive}
+                    aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
+                    className={`min-h-11 flex-1 border-b-[3px] px-3 text-sm font-semibold disabled:opacity-60 ${activeTab === 'manage' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
                   >
                     Manage
                   </button>
                 </div>
                 <button
                   type='button'
-                  title='Exchange property with other players.'
+                  title={
+                    auctionActive
+                      ? 'Finish the auction first'
+                      : 'Exchange property with other players.'
+                  }
+                  aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
                   onClick={() => setShowTrade(true)}
-                  disabled={Boolean(roomCode) && !connected}
+                  disabled={auctionActive || (Boolean(roomCode) && !connected)}
                   className='min-h-11 flex-1 rounded-tr-lg border-b-[3px] border-transparent bg-felt-deep px-3 text-sm font-semibold text-paper disabled:opacity-60'
                 >
                   Trade
@@ -827,9 +860,17 @@ function Control() {
               {activeTab === 'buy' && (
                 <div>
                   <div
+                    ref={logRef}
                     role='log'
                     aria-live='polite'
-                    className='w-full h-18 lg:h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-sans text-(--t-sm) leading-[1.4] bg-card text-ink overflow-y-auto box-border'
+                    onScroll={(e) => {
+                      logStuck.current =
+                        e.target.scrollHeight -
+                          e.target.scrollTop -
+                          e.target.clientHeight <
+                        24;
+                    }}
+                    className='w-full h-28 sm:h-18 lg:h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-sans text-(--t-sm) leading-[1.4] bg-card text-ink overflow-y-auto box-border'
                   >
                     {alerts.map((a, i) => (
                       <div key={i}>{a}</div>
@@ -878,7 +919,7 @@ function Control() {
 
                   {/* Landed info + buy/auction */}
                   {landed && (
-                    <div className='block px-2 py-1.5 border border-line border-t-0 rounded-b-md w-full m-0 text-center bg-card box-border'>
+                    <div className='block px-2 py-1.5 border border-line border-t-0 border-l-4 border-l-gold rounded-b-md w-full m-0 text-center bg-paper font-semibold text-ink box-border'>
                       {landed}
                       {canBuyProperty && (
                         <div className='mt-1.5'>
@@ -1016,6 +1057,11 @@ function Control() {
           </tr>
         </tbody>
       </table>
+      {auctionActive && (
+        <span id='auction-lock-note' className='sr-only'>
+          Finish the auction first
+        </span>
+      )}
       <div className='sticky bottom-0 z-5 -mx-2 mt-2 flex flex-wrap items-center justify-center gap-2 border-t border-line bg-paper px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-3 sm:px-3'>
         {roomCode && !connected ? (
           <p className='w-full text-center text-sm font-semibold text-danger'>
@@ -1023,11 +1069,15 @@ function Control() {
           </p>
         ) : (
           roomCode &&
-          !isMyTurn && (
-            <p className='w-full text-center text-sm text-ink-muted'>
+          (isMyTurn ? (
+            <p className='w-full text-center text-sm font-semibold text-ink'>
+              Your turn
+            </p>
+          ) : (
+            <p className='w-full text-center text-sm font-medium text-ink'>
               Waiting for {currentPlayer ? currentPlayer.name : 'opponent'}...
             </p>
-          )
+          ))
         )}
         {showRollButton && (
           <Button
@@ -1050,9 +1100,14 @@ function Control() {
           <Button
             variant='primary'
             size='lg'
-            title='End turn and advance to the next player.'
+            title={
+              auctionActive
+                ? 'Finish the auction first'
+                : 'End turn and advance to the next player.'
+            }
+            aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
             onClick={() => handleEndTurn()}
-            disabled={!isMyTurn || (roomCode && !connected)}
+            disabled={auctionActive || !isMyTurn || (roomCode && !connected)}
           >
             End Turn
           </Button>
@@ -1061,8 +1116,14 @@ function Control() {
           variant='ghost'
           size='sm'
           id='resignbutton'
-          className='ml-4 text-danger!'
-          title='If you cannot pay your debt then you must resign from the game.'
+          className='ml-4 border-l border-line pl-4 text-danger!'
+          title={
+            auctionActive
+              ? 'Finish the auction first'
+              : 'If you cannot pay your debt then you must resign from the game.'
+          }
+          aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
+          disabled={auctionActive}
           aria-haspopup='dialog'
           onClick={() => setConfirmResign(true)}
         >

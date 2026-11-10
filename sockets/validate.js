@@ -18,6 +18,9 @@ const COLORS = [
   'teal',
 ];
 
+// Starting cash choices the host may pick before the game starts
+const STARTING_MONEY_OPTIONS = [500, 1000, 1500, 2000, 5000, 10000];
+
 // Max size of a gameState once JSON-encoded (socket packet cap is 100KB)
 const MAX_STATE_BYTES = 90000;
 
@@ -204,6 +207,7 @@ function makeToken() {
 }
 
 module.exports = {
+  STARTING_MONEY_OPTIONS,
   isPlainObject,
   sanitizeName,
   normalizeColor,

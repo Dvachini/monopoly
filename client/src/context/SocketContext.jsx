@@ -42,6 +42,9 @@ export function SocketProvider({ children }) {
   const [lobbyError, setLobbyError] = useState('');
   const [gameStarted, setGameStarted] = useState(false);
   const [rejoining, setRejoining] = useState(false);
+  const [roomInfo, setRoomInfo] = useState(null); // {takenColors, started, full}
+  const [startingMoney, setStartingMoneyState] = useState(1500);
+  const [renameError, setRenameError] = useState('');
   const rejoinAttempted = useRef(false);
   const rejoinTimer = useRef(null);
   // Another tab took our seat: do not reconnect and fight for it
@@ -123,10 +126,18 @@ export function SocketProvider({ children }) {
     // token is only sent to this socket; keep it in the session, never log it
     socket.on(
       'room-created',
-      ({ roomCode: code, players, playerIndex, token, hostIndex: host }) => {
+      ({
+        roomCode: code,
+        players,
+        playerIndex,
+        token,
+        hostIndex: host,
+        startingMoney: money,
+      }) => {
         setRoomCode(code);
         setRoomPlayers(players);
         setHostIndex(host);
+        if (money !== undefined) setStartingMoneyState(money);
         setMyPlayerIndex(playerIndex);
         setLobbyError('');
         saveSession({
@@ -140,10 +151,18 @@ export function SocketProvider({ children }) {
 
     socket.on(
       'room-joined',
-      ({ roomCode: code, players, playerIndex, token, hostIndex: host }) => {
+      ({
+        roomCode: code,
+        players,
+        playerIndex,
+        token,
+        hostIndex: host,
+        startingMoney: money,
+      }) => {
         setRoomCode(code);
         setRoomPlayers(players);
         setHostIndex(host);
+        if (money !== undefined) setStartingMoneyState(money);
         setMyPlayerIndex(playerIndex);
         setLobbyError('');
         saveSession({
@@ -155,9 +174,24 @@ export function SocketProvider({ children }) {
       },
     );
 
-    socket.on('room-updated', ({ players, hostIndex: host }) => {
+    // renamed is handled where the game state lives (Setup.jsx)
+    socket.on('room-updated', ({ players, hostIndex: host, startingMoney: money, renamed }) => {
+      if (renamed) setRenameError('');
       setRoomPlayers(players);
       if (host !== undefined) setHostIndex(host);
+      if (money !== undefined) setStartingMoneyState(money);
+    });
+
+    socket.on('room-info', (info) => {
+      setRoomInfo(info);
+    });
+
+    socket.on('rename-error', ({ message }) => {
+      setRenameError(message);
+    });
+
+    socket.on('money-error', ({ message }) => {
+      setLobbyError(message);
     });
 
     socket.on('join-error', ({ message }) => {
@@ -171,11 +205,13 @@ export function SocketProvider({ children }) {
     // Seats are renumbered 1..N at start: adopt the new numbers
     socket.on(
       'game-started',
-      ({ players, hostIndex: host, playerIndex }) => {
+      ({ players, hostIndex: host, playerIndex, startingMoney: money }) => {
         setRoomPlayers(players);
         if (host !== undefined) setHostIndex(host);
+        if (money !== undefined) setStartingMoneyState(money);
         if (playerIndex !== undefined) setMyPlayerIndex(playerIndex);
         setGameStarted(true);
+        setRenameError('');
         // Mark session as in-game so reconnect works
         const session = loadSession();
         if (session) {
@@ -202,12 +238,14 @@ export function SocketProvider({ children }) {
         hostIndex: host,
         gameState,
         started,
+        startingMoney: money,
       }) => {
         console.log('Rejoin successful');
         clearTimeout(rejoinTimer.current);
         setRoomCode(code);
         setRoomPlayers(players);
         if (host !== undefined) setHostIndex(host);
+        if (money !== undefined) setStartingMoneyState(money);
         setMyPlayerIndex(playerIndex);
         // In the lobby there is no game state yet: stay in the waiting room
         const inGame = started !== undefined ? started : !!gameState;
@@ -241,6 +279,9 @@ export function SocketProvider({ children }) {
       socket.off('room-updated');
       socket.off('join-error');
       socket.off('start-error');
+      socket.off('room-info');
+      socket.off('rename-error');
+      socket.off('money-error');
       socket.off('game-started');
       socket.off('player-disconnected');
       socket.off('rejoin-success');
@@ -259,6 +300,27 @@ export function SocketProvider({ children }) {
     if (socket) {
       setLobbyError('');
       socket.emit('join-room', { roomCode: code, playerName, playerColor });
+    }
+  };
+
+  // Ask which colours are taken in a room before joining it
+  const fetchRoomInfo = (code) => {
+    if (socket) {
+      socket.emit('room-info', { roomCode: code });
+    }
+  };
+
+  const renamePlayer = (name) => {
+    if (socket) {
+      setRenameError('');
+      socket.emit('rename', { name });
+    }
+  };
+
+  const setStartingMoney = (amount) => {
+    if (socket) {
+      setLobbyError('');
+      socket.emit('set-starting-money', { amount });
     }
   };
 
@@ -295,12 +357,21 @@ export function SocketProvider({ children }) {
     isHost,
     myPlayerIndex,
     lobbyError,
+    setLobbyError,
     gameStarted,
     setGameStarted,
     rejoining,
     clearSession,
     createRoom,
     joinRoom,
+    roomInfo,
+    setRoomInfo,
+    fetchRoomInfo,
+    startingMoney,
+    setStartingMoney,
+    renameError,
+    setRenameError,
+    renamePlayer,
     startGame,
     emit,
     on,

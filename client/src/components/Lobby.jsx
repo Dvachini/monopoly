@@ -1,8 +1,9 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import SocketContext from '../context/SocketContext.jsx';
 import GameContext from '../context/GameContext.jsx';
 import Button from './Button.jsx';
+import { STARTING_CASH_OPTIONS } from '../game/constants.jsx';
 
 const COLORS = [
   'Yellow',
@@ -21,9 +22,13 @@ function Lobby() {
     roomCode,
     roomPlayers,
     lobbyError,
+    setLobbyError,
     gameStarted,
     createRoom,
     joinRoom,
+    roomInfo,
+    setRoomInfo,
+    fetchRoomInfo,
     rejoining,
   } = useContext(SocketContext);
 
@@ -33,6 +38,7 @@ function Lobby() {
   const [playerName, setPlayerName] = useState('');
   const [playerColor, setPlayerColor] = useState('Yellow');
   const [joinCode, setJoinCode] = useState('');
+  const [colorError, setColorError] = useState('');
 
   // Auto-join if URL has ?room=CODE
   useEffect(() => {
@@ -43,6 +49,33 @@ function Lobby() {
       setMode('join');
     }
   }, [connected]);
+
+  // Ask the server which colours are taken once the room code is complete
+  useEffect(() => {
+    setRoomInfo(null);
+    if (mode !== 'join' || joinCode.length !== 6 || !connected) return undefined;
+    const t = setTimeout(() => {
+      setLobbyError('');
+      fetchRoomInfo(joinCode);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [mode, joinCode, connected]);
+
+  // Move off a colour that someone else holds
+  useEffect(() => {
+    if (!roomInfo || !roomInfo.takenColors.includes(playerColor.toLowerCase())) {
+      return;
+    }
+    const free = COLORS.find((c) => !roomInfo.takenColors.includes(c.toLowerCase()));
+    if (free) setPlayerColor(free);
+  }, [roomInfo]);
+
+  // Lost the race for a colour: say which one and look again
+  useEffect(() => {
+    if (lobbyError !== 'Colour not available.' || mode !== 'join') return;
+    setColorError(`${playerColor} is already taken, pick another colour.`);
+    fetchRoomInfo(joinCode);
+  }, [lobbyError]);
 
   // Don't show lobby if game is playing, finished, or local setup
   if (status === 'playing' || status === 'finished' || gameStarted) return null;
@@ -158,9 +191,10 @@ function Lobby() {
             <legend className='mb-1 text-sm font-semibold'>Token colour</legend>
             <div className='grid grid-cols-4 gap-2'>
               {COLORS.map((c) => {
-                const taken = roomPlayers.some(
-                  (p) => p.color === c.toLowerCase(),
-                );
+                const taken =
+                  mode === 'join' &&
+                  !!roomInfo &&
+                  roomInfo.takenColors.includes(c.toLowerCase());
                 return (
                   <div key={c} className='relative'>
                     <input
@@ -226,7 +260,7 @@ function Lobby() {
 
           <div role='alert' aria-live='assertive' className='min-h-5 text-sm'>
             {lobbyError && (
-              <span className='inline-flex items-start gap-1.5 font-semibold text-danger'>
+              <div className='flex items-start gap-1.5 rounded-[10px] border border-danger bg-[#fdecec] p-2 font-semibold text-danger'>
                 <svg
                   viewBox='0 0 16 16'
                   className='mt-0.5 h-4 w-4 flex-none'
@@ -240,26 +274,32 @@ function Lobby() {
                     strokeLinecap='round'
                   />
                 </svg>
-                {lobbyError}
-              </span>
+                {lobbyError === 'Colour not available.' && colorError
+                  ? colorError
+                  : lobbyError}
+              </div>
             )}
           </div>
 
           <div className='flex flex-wrap gap-2'>
             <Button
               variant='primary'
-              onClick={() =>
-                mode === 'create'
-                  ? createRoom(
-                      playerName.trim() || 'Player 1',
-                      playerColor.toLowerCase(),
-                    )
-                  : joinRoom(
-                      joinCode,
-                      playerName.trim() || 'Player',
-                      playerColor.toLowerCase(),
-                    )
-              }
+              onClick={() => {
+                // Clear first so the same error twice still shows and re-runs the effects
+                setLobbyError('');
+                if (mode === 'create') {
+                  createRoom(
+                    playerName.trim() || 'Player 1',
+                    playerColor.toLowerCase(),
+                  );
+                } else {
+                  joinRoom(
+                    joinCode,
+                    playerName.trim() || 'Player',
+                    playerColor.toLowerCase(),
+                  );
+                }
+              }}
               disabled={
                 !connected || (mode === 'join' && joinCode.length < 4)
               }
@@ -351,10 +391,19 @@ function WaitingRoom() {
     lobbyError,
     startGame,
     myPlayerIndex,
+    startingMoney,
+    setStartingMoney,
+    renameError,
+    setRenameError,
+    renamePlayer,
   } = useContext(SocketContext);
 
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [pendingName, setPendingName] = useState('');
   const [copied, setCopied] = useState(''); // '' | 'code' | 'link'
   const [shareError, setShareError] = useState('');
+  const wasEditing = useRef(false);
 
   const joinUrl = `${window.location.origin}/?room=${roomCode}`;
   const canShare = typeof navigator.share === 'function';
@@ -364,6 +413,42 @@ function WaitingRoom() {
     const t = setTimeout(() => setCopied(''), 2000);
     return () => clearTimeout(t);
   }, [copied]);
+
+  // Close the editor once the server confirms the new name
+  useEffect(() => {
+    const me = roomPlayers.find((p) => p.index === myPlayerIndex);
+    if (pendingName && me && me.name === pendingName) {
+      setPendingName('');
+      setEditing(false);
+    }
+  }, [roomPlayers]);
+
+  useEffect(() => {
+    if (renameError) setPendingName('');
+  }, [renameError]);
+
+  // Editor closed: give focus back to the button that opened it
+  useEffect(() => {
+    if (wasEditing.current && !editing) {
+      const btn = document.getElementById('lobby-editname');
+      if (btn) btn.focus();
+    }
+    wasEditing.current = editing;
+  }, [editing]);
+
+  const saveName = (e) => {
+    e.preventDefault();
+    const me = roomPlayers.find((p) => p.index === myPlayerIndex);
+    // Same clean-up the server does: collapse inner spaces, trim
+    const name = draftName.trim().replace(/\s+/g, ' ');
+    if (me && name === me.name) {
+      setRenameError('');
+      setEditing(false);
+      return;
+    }
+    setPendingName(name);
+    renamePlayer(name);
+  };
 
   const copyText = async (text, which) => {
     setShareError('');
@@ -467,7 +552,51 @@ function WaitingRoom() {
                 >
                   <span className='disc-num'>{p.index}</span>
                 </span>
-                <span className='font-bold'>{p.name}</span>
+                {p.index === myPlayerIndex && editing ? (
+                  <form onSubmit={saveName} className='flex min-w-0 flex-1 gap-1.5'>
+                    <input
+                      type='text'
+                      aria-label='Your name'
+                      maxLength={20}
+                      autoFocus
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setRenameError('');
+                          setPendingName('');
+                          setEditing(false);
+                        }
+                      }}
+                      className='min-h-11 min-w-0 flex-1 rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink'
+                    />
+                    <Button
+                      type='submit'
+                      variant='primary'
+                      size='sm'
+                      className='lg:min-h-11!'
+                    >
+                      Save
+                    </Button>
+                  </form>
+                ) : (
+                  <span className='font-bold'>{p.name}</span>
+                )}
+                {p.index === myPlayerIndex && !editing && (
+                  <Button
+                    id='lobby-editname'
+                    size='sm'
+                    variant='ghost'
+                    className='lg:min-h-11!'
+                    onClick={() => {
+                      setRenameError('');
+                      setDraftName(p.name);
+                      setEditing(true);
+                    }}
+                  >
+                    Edit name
+                  </Button>
+                )}
                 <span className='ml-auto flex gap-1.5'>
                   {p.index === hostIndex && (
                     <span className='rounded-full border border-line-strong px-2 text-xs font-semibold text-ink-2'>
@@ -483,7 +612,37 @@ function WaitingRoom() {
               </li>
             ))}
           </ul>
+          <div aria-live='polite' className='min-h-5 text-sm'>
+            {renameError && (
+              <span className='font-semibold text-danger'>{renameError}</span>
+            )}
+          </div>
         </div>
+
+        {isHost ? (
+          <div className='w-full'>
+            <label
+              htmlFor='lobby-starting-cash'
+              className='mb-1 block text-sm font-semibold'
+            >
+              Starting cash
+            </label>
+            <select
+              id='lobby-starting-cash'
+              value={startingMoney}
+              onChange={(e) => setStartingMoney(parseInt(e.target.value, 10))}
+              className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink'
+            >
+              {STARTING_CASH_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  ${n}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p className='text-sm font-semibold'>Starting cash: ${startingMoney}</p>
+        )}
 
         {isHost && (
           <div className='flex w-full flex-col items-center gap-1'>
