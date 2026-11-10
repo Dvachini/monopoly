@@ -1,10 +1,11 @@
 import React, { useState, useContext, useEffect } from 'react';
 import Button from './Button.jsx';
+import Pawn from './Pawn.jsx';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import { createGameEngine } from '../game/monopoly.jsx';
 import { Player } from '../game/models.jsx';
-import { STARTING_CASH_OPTIONS } from '../game/constants.jsx';
+import { STARTING_CASH_OPTIONS, DEFAULT_STARTING_CASH } from '../game/constants.jsx';
 
 const DEFAULT_COLORS = [
   'Yellow',
@@ -32,6 +33,7 @@ function Setup() {
     setCommunityChestCards,
     setChanceCards,
     setEdition,
+    setStartingMoney: setLocalStartingMoney,
     gameRef,
   } = useContext(GameContext);
 
@@ -47,7 +49,7 @@ function Setup() {
   } = useContext(SocketContext);
 
   const [playerCount, setPlayerCount] = useState(4);
-  const [startingCash, setStartingCash] = useState(1500);
+  const [startingCash, setStartingCash] = useState(DEFAULT_STARTING_CASH);
   const [playerInputs, setPlayerInputs] = useState(
     Array.from({ length: 8 }, (_, i) => ({
       name: `Player ${i + 1}`,
@@ -234,6 +236,7 @@ function Setup() {
     setPlayers(newPlayers);
     setSquares(engine.square);
     setPcount(playerCount);
+    setLocalStartingMoney(startingCash);
     setTurn(1);
     setCommunityChestCards(engine.communityChestCards);
     setChanceCards(engine.chanceCards);
@@ -270,19 +273,17 @@ function Setup() {
     <div className='flex w-full flex-col items-center p-3 sm:p-5'>
       <div className='flex w-full max-w-md flex-col gap-4'>
         <div className='flex items-center justify-between gap-3'>
-          <h1 className='font-display text-(--t-2xl) font-bold leading-tight text-paper'>
-            Local game
-          </h1>
+          <h1 className='plate text-(--t-xl)'>Local game</h1>
           <Button onClick={() => setStatus('lobby')}>Back</Button>
         </div>
 
-        <div className='card flex flex-col gap-3 p-4'>
+        <div className='card card-gold flex flex-col gap-3 p-4'>
           <div
             role='group'
             aria-labelledby='local-count-label'
             className='flex flex-col gap-1'
           >
-            <div id='local-count-label' className='text-sm font-semibold'>
+            <div id='local-count-label' className='label'>
               Number of players
             </div>
             <div className='flex flex-wrap gap-1.5'>
@@ -305,17 +306,14 @@ function Setup() {
           </div>
 
           <div>
-            <label
-              htmlFor='local-starting-cash'
-              className='mb-1 block text-sm font-semibold'
-            >
+            <label htmlFor='local-starting-cash' className='label'>
               Starting cash
             </label>
             <select
               id='local-starting-cash'
               value={startingCash}
               onChange={(e) => setStartingCash(parseInt(e.target.value, 10))}
-              className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink'
+              className='field'
             >
               {STARTING_CASH_OPTIONS.map((n) => (
                 <option key={n} value={n}>
@@ -327,14 +325,22 @@ function Setup() {
         </div>
 
         {Array.from({ length: playerCount }, (_, i) => (
-          <div key={i} className='card flex flex-col gap-3 p-4'>
-            <h2 className='text-base font-semibold'>Player {i + 1}</h2>
+          <div
+            key={i}
+            className='card flex flex-col gap-3 border-l-[5px] p-4'
+            style={{ borderLeftColor: playerInputs[i].color.toLowerCase() }}
+          >
+            <h2 className='flex items-center gap-2 text-base font-semibold'>
+              <Pawn
+                color={playerInputs[i].color.toLowerCase()}
+                n={i + 1}
+                size={34}
+              />
+              Player {i + 1}
+            </h2>
 
             <div>
-              <label
-                htmlFor={`local-name-${i}`}
-                className='mb-1 block text-sm font-semibold'
-              >
+              <label htmlFor={`local-name-${i}`} className='label'>
                 Name
               </label>
               <input
@@ -344,14 +350,12 @@ function Setup() {
                 value={playerInputs[i].name}
                 autoComplete='off'
                 onChange={(e) => handlePlayerChange(i, 'name', e.target.value)}
-                className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink placeholder:text-[#6b6258]'
+                className='field'
               />
             </div>
 
             <fieldset>
-              <legend className='mb-1 text-sm font-semibold'>
-                Token colour
-              </legend>
+              <legend className='label'>Token colour</legend>
               <div className='grid grid-cols-4 gap-2'>
                 {DEFAULT_COLORS.map((c) => {
                   const taken = playerInputs.some(
@@ -370,7 +374,7 @@ function Setup() {
                       />
                       <label
                         htmlFor={`local-color-${i}-${c}`}
-                        className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 p-1 text-xs font-semibold text-ink peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-info ${
+                        className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 p-1 text-xs font-semibold shadow-[0_2px_0_rgb(0_0_0/0.18)] text-ink peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-info ${
                           taken
                             ? 'cursor-not-allowed border-[#cfc3ab] bg-[#e7dfd0] text-ink-muted'
                             : playerInputs[i].color === c
@@ -378,14 +382,12 @@ function Setup() {
                               : 'border-line-strong bg-card'
                         }`}
                       >
-                        <span
-                          className='disc h-7 w-7'
-                          style={{ backgroundColor: c.toLowerCase() }}
-                        >
+                        <span className='relative inline-flex'>
+                          <Pawn color={c.toLowerCase()} n='' size={36} />
                           {taken && (
                             <svg
                               viewBox='0 0 28 28'
-                              className='h-7 w-7'
+                              className='absolute inset-0 h-full w-full'
                               aria-hidden='true'
                             >
                               <path
@@ -425,7 +427,7 @@ function Setup() {
               aria-labelledby={`local-type-${i}`}
               className='flex flex-col gap-1'
             >
-              <div id={`local-type-${i}`} className='text-sm font-semibold'>
+              <div id={`local-type-${i}`} className='label'>
                 Controlled by
               </div>
               <div className='flex gap-1.5'>

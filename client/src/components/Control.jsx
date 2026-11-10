@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import { rollDice, calculateRent } from '../game/monopoly.jsx';
+import { isBankrupt, bankruptcyLimit } from '../game/constants.jsx';
 import Button from './Button.jsx';
 import useDialogFocus from './useDialogFocus.jsx';
 
@@ -14,9 +15,6 @@ function Control() {
     alerts,
     landed,
     setLanded,
-    die1,
-    die2,
-    diceRolled,
     setDie1,
     setDie2,
     setDiceRolled,
@@ -53,10 +51,19 @@ function Control() {
     setShowMoneyBar,
     auctionEndTurnPending,
     setAuctionEndTurnPending,
+    startingMoney: localStartingMoney,
   } = useContext(GameContext);
 
-  const { socket, myPlayerIndex, roomCode, roomPlayers, isHost, connected } =
-    useContext(SocketContext);
+  const {
+    socket,
+    myPlayerIndex,
+    roomCode,
+    roomPlayers,
+    isHost,
+    connected,
+    startingMoney: socketStartingMoney,
+  } = useContext(SocketContext);
+  const startingMoney = roomCode ? socketStartingMoney : localStartingMoney;
 
   const [selectedProperty, setSelectedProperty] = useState(null);
   const [hasRolled, setHasRolled] = useState(false);
@@ -476,7 +483,7 @@ function Control() {
       if (
         ps[nextTurn] &&
         ps[nextTurn].position >= 0 &&
-        ps[nextTurn].money >= -1500
+        !isBankrupt(ps[nextTurn].money, startingMoney)
       ) {
         break;
       }
@@ -823,7 +830,7 @@ function Control() {
                     onClick={() => setActiveTab('buy')}
                     className={`min-h-11 flex-1 rounded-tl-lg border-b-[3px] px-3 text-sm font-semibold ${activeTab === 'buy' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
                   >
-                    Buy
+                    Play
                   </button>
                   <button
                     type='button'
@@ -859,6 +866,42 @@ function Control() {
 
               {activeTab === 'buy' && (
                 <div>
+                  {/* Landed info + buy/auction */}
+                  {landed && (
+                    <div className='mt-2 w-full rounded-md border border-line border-l-4 border-l-gold bg-paper p-2 font-semibold text-ink box-border'>
+                      <div className='text-base'>{landed}</div>
+                      {canBuyProperty && (
+                        <div className='mt-2 flex gap-2'>
+                          <Button
+                            variant='primary'
+                            className='flex-1'
+                            onClick={handleBuyProperty}
+                            title={`Buy ${squares[currentPlayer.position].name}`}
+                            disabled={
+                              auctionActive ||
+                              !isMyTurn ||
+                              (roomCode && !connected)
+                            }
+                          >
+                            {`Buy ($${squares[currentPlayer.position].price})`}
+                          </Button>
+                          <Button
+                            className='flex-1'
+                            onClick={handleStartAuction}
+                            title='Put this property up for auction'
+                            disabled={
+                              auctionActive ||
+                              !isMyTurn ||
+                              (roomCode && !connected)
+                            }
+                          >
+                            Auction
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div
                     ref={logRef}
                     role='log'
@@ -870,16 +913,23 @@ function Control() {
                           e.target.clientHeight <
                         24;
                     }}
-                    className='w-full h-28 sm:h-18 lg:h-20 m-0 px-1.5 py-1 border border-line-strong rounded-b-md font-sans text-(--t-sm) leading-[1.4] bg-card text-ink overflow-y-auto box-border'
+                    className='mt-2 w-full h-28 sm:h-18 lg:h-20 px-1.5 py-1 border border-line-strong rounded-md font-sans text-(--t-sm) leading-[1.4] bg-card text-ink overflow-y-auto box-border'
                   >
                     {alerts.map((a, i) => (
-                      <div key={i}>{a}</div>
+                      <div
+                        key={i}
+                        className={
+                          i === alerts.length - 1 ? 'log-line log-new' : 'log-line'
+                        }
+                      >
+                        {a}
+                      </div>
                     ))}
                   </div>
 
                   {/* Jail options */}
                   {playerInJail && !hasRolled && (
-                    <div className='block px-2 py-1.5 border border-line border-t-0 rounded-b-md w-full m-0 text-center bg-card box-border'>
+                    <div className='mt-2 block px-2 py-1.5 border border-line rounded-md w-full text-center bg-card box-border'>
                       <div>You are in jail.</div>
                       <Button
                         size='sm'
@@ -917,42 +967,6 @@ function Control() {
                     </div>
                   )}
 
-                  {/* Landed info + buy/auction */}
-                  {landed && (
-                    <div className='block px-2 py-1.5 border border-line border-t-0 border-l-4 border-l-gold rounded-b-md w-full m-0 text-center bg-paper font-semibold text-ink box-border'>
-                      {landed}
-                      {canBuyProperty && (
-                        <div className='mt-1.5'>
-                          <Button
-                            variant='primary'
-                            size='sm'
-                            onClick={handleBuyProperty}
-                            title={`Buy ${squares[currentPlayer.position].name}`}
-                            disabled={
-                              auctionActive ||
-                              !isMyTurn ||
-                              (roomCode && !connected)
-                            }
-                          >
-                            {`Buy ($${squares[currentPlayer.position].price})`}
-                          </Button>
-                          <Button
-                            size='sm'
-                            onClick={handleStartAuction}
-                            title='Put this property up for auction'
-                            className='ml-1.5'
-                            disabled={
-                              auctionActive ||
-                              !isMyTurn ||
-                              (roomCode && !connected)
-                            }
-                          >
-                            Auction
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -1026,34 +1040,6 @@ function Control() {
                 </div>
               )}
             </td>
-            <td className='align-top border-none'>
-              <div>
-                {diceRolled && (
-                  <>
-                    <div
-                      className='block m-1.5 float-left'
-                      title={`Die (${die1} spots)`}
-                    >
-                      <img
-                        className='w-9 h-9'
-                        src={`/images/Die_${die1}.png`}
-                        alt={die1}
-                      />
-                    </div>
-                    <div
-                      className='block m-1.5 float-left'
-                      title={`Die (${die2} spots)`}
-                    >
-                      <img
-                        className='w-9 h-9'
-                        src={`/images/Die_${die2}.png`}
-                        alt={die2}
-                      />
-                    </div>
-                  </>
-                )}
-              </div>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -1062,27 +1048,47 @@ function Control() {
           Finish the auction first
         </span>
       )}
-      <div className='sticky bottom-0 z-5 -mx-2 mt-2 flex flex-wrap items-center justify-center gap-2 border-t border-line bg-paper px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:-mx-3 sm:px-3'>
-        {roomCode && !connected ? (
-          <p className='w-full text-center text-sm font-semibold text-danger'>
-            Offline. Actions are paused until you reconnect.
-          </p>
-        ) : (
-          roomCode &&
-          (isMyTurn ? (
-            <p className='w-full text-center text-sm font-semibold text-ink'>
-              Your turn
-            </p>
-          ) : (
-            <p className='w-full text-center text-sm font-medium text-ink'>
-              Waiting for {currentPlayer ? currentPlayer.name : 'opponent'}...
-            </p>
-          ))
-        )}
+      <div className='mt-2 flex items-center gap-3'>
+        <p className='min-w-0 flex-1 text-(--t-xs) text-ink-muted'>
+          {`Bankrupt below -$${-bankruptcyLimit(startingMoney)}`}
+        </p>
+        <Button
+          variant='ghost'
+          size='sm'
+          id='resignbutton'
+          className='lg:min-h-11! text-danger!'
+          title={
+            auctionActive
+              ? 'Finish the auction first'
+              : 'If you cannot pay your debt then you must resign from the game.'
+          }
+          aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
+          disabled={auctionActive}
+          aria-haspopup='dialog'
+          onClick={() => setConfirmResign(true)}
+        >
+          Resign
+        </Button>
+      </div>
+      <div className='action-bar'>
+        <p
+          className={`status ${roomCode && !connected ? 'text-danger' : 'text-ink'}`}
+        >
+          {roomCode && !connected
+            ? 'Offline. Actions are paused'
+            : roomCode && !isMyTurn
+              ? `Waiting for ${currentPlayer ? currentPlayer.name : 'opponent'}...`
+              : canRollAgain
+                ? 'Roll again (doubles)'
+                : roomCode
+                  ? 'Your turn'
+                  : `${currentPlayer ? currentPlayer.name : 'Player'}'s turn`}
+        </p>
         {showRollButton && (
           <Button
             variant='primary'
             size='lg'
+            className='btn-main'
             title={
               canRollAgain
                 ? 'You threw doubles. Roll again.'
@@ -1100,6 +1106,7 @@ function Control() {
           <Button
             variant='primary'
             size='lg'
+            className='btn-main'
             title={
               auctionActive
                 ? 'Finish the auction first'
@@ -1112,29 +1119,12 @@ function Control() {
             End Turn
           </Button>
         )}
-        <Button
-          variant='ghost'
-          size='sm'
-          id='resignbutton'
-          className='ml-4 border-l border-line pl-4 text-danger!'
-          title={
-            auctionActive
-              ? 'Finish the auction first'
-              : 'If you cannot pay your debt then you must resign from the game.'
-          }
-          aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
-          disabled={auctionActive}
-          aria-haspopup='dialog'
-          onClick={() => setConfirmResign(true)}
-        >
-          Resign
-        </Button>
       </div>
       {confirmResign &&
         createPortal(
         <>
           <div
-            className='fixed inset-0 bg-black/50 z-30'
+            className='scrim [--z:var(--z-confirm)]'
             onClick={() => setConfirmResign(false)}
           />
           <div
@@ -1144,21 +1134,20 @@ function Control() {
             aria-modal='true'
             aria-labelledby='resign-title'
             aria-describedby='resign-desc'
-            className='fixed inset-0 z-31 flex items-center justify-center p-4 select-none pointer-events-none'
+            className='dialog-wrap select-none [--z:var(--z-confirm)]'
           >
-            <div className='modal pointer-events-auto w-full max-w-sm min-w-0 p-5 text-center'>
-              <h2
-                id='resign-title'
-                className='font-display text-(--t-xl) font-bold leading-tight'
-              >
-                Resign from the game?
-              </h2>
-              <p id='resign-desc' className='mt-2 text-base'>
+            <div className='modal'>
+              <div className='modal-head'>
+                <h2 id='resign-title' className='modal-title'>
+                  Resign from the game?
+                </h2>
+              </div>
+              <p id='resign-desc' className='modal-body text-base'>
                 {currentPlayer ? `${currentPlayer.name}, you` : 'You'} will
                 leave the game and cannot rejoin. Your cash is lost and your
                 properties go back to the bank. This cannot be undone.
               </p>
-              <div className='mt-4 flex gap-3'>
+              <div className='modal-foot'>
                 <Button full onClick={() => setConfirmResign(false)}>
                   Cancel
                 </Button>

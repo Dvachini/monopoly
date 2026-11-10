@@ -6,6 +6,7 @@ const {
   normalizeColor,
   checkStateShape,
   bidderUpdate,
+  DEFAULT_STARTING_MONEY,
   clientIp,
   makeRoomCode,
   makeToken,
@@ -198,7 +199,7 @@ module.exports = function (io, opts = {}) {
         started: false,
         gameState: null,
         turn: 0,
-        startingMoney: 1500,
+        startingMoney: DEFAULT_STARTING_MONEY,
         lastActive: Date.now(),
       };
 
@@ -528,6 +529,7 @@ module.exports = function (io, opts = {}) {
           gameState,
           socket.playerIndex,
           room.turn,
+          room.startingMoney,
         );
         if (!clean) return;
         room.gameState = { ...room.gameState, ...clean };

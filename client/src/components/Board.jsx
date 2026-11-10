@@ -1,8 +1,11 @@
 import React, { useContext, useEffect, useState } from 'react';
 import GameContext from '../context/GameContext.jsx';
+import SocketContext from '../context/SocketContext.jsx';
 import Control from './Control.jsx';
 import MoneyBar from './MoneyBar.jsx';
 import Button from './Button.jsx';
+import SquareIcon from './SquareIcon.jsx';
+import Pawn from './Pawn.jsx';
 
 // groupNumber -> group name (matches data/classicedition.jsx)
 const GROUP_NAMES = [
@@ -18,6 +21,35 @@ const GROUP_NAMES = [
   'Green',
   'Dark blue',
 ];
+
+// Owner colour name -> hex, to pick a readable digit ink for the ownership ribbon
+const OWNER_HEX = {
+  yellow: '#ffff00',
+  blue: '#0000ff',
+  red: '#ff0000',
+  lime: '#00ff00',
+  green: '#008000',
+  aqua: '#00ffff',
+  orange: '#ffa500',
+  purple: '#800080',
+  fuchsia: '#ff00ff',
+  maroon: '#800000',
+  navy: '#000080',
+  olive: '#808000',
+  silver: '#c0c0c0',
+  teal: '#008080',
+};
+
+// true when the ink digit has more contrast than white on this owner colour
+function prefersInk(color) {
+  const hex = OWNER_HEX[String(color).toLowerCase()];
+  if (!hex) return false;
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.179;
+}
 
 // Short labels for small boards (UI only, classic edition). \n = line break
 const SHORT_NAMES = {
@@ -53,23 +85,48 @@ const SHORT_NAMES = {
   39: 'Board',
 };
 
-// Squares that show an existing icon instead of short text
-const SQUARE_ICONS = {
-  2: 'community_chest_icon',
-  4: 'tax_icon',
-  7: 'chance_icon',
-  12: 'electric_icon',
-  17: 'community_chest_icon',
-  22: 'chance_icon',
-  28: 'water_icon',
-  33: 'community_chest_icon',
-  36: 'chance_icon',
-  38: 'tax_icon',
+// Squares that show an icon (see SquareIcon.jsx)
+const SQUARE_KINDS = {
+  0: 'go',
+  2: 'chest',
+  4: 'tax',
+  5: 'rail',
+  7: 'chance',
+  10: 'jail',
+  12: 'electric',
+  15: 'rail',
+  17: 'chest',
+  20: 'parking',
+  22: 'chance',
+  25: 'rail',
+  28: 'water',
+  30: 'gotojail',
+  33: 'chest',
+  35: 'rail',
+  36: 'chance',
+  38: 'tax',
+};
+
+// Corner squares: title (\n = line break) and the rule line under it
+const CORNERS = {
+  0: { title: 'GO', sub: 'Collect $200', tint: 'cell-go' },
+  10: { title: 'JAIL', sub: 'Just visiting', tint: 'cell-jail' },
+  20: { title: 'FREE\nPARKING', sub: '', tint: 'cell-park' },
+  30: { title: 'GO TO\nJAIL', sub: 'Go directly to jail', tint: 'cell-go' },
 };
 
 function Board() {
-  const { showBoard, squares, players, turn, setDeedIndex } =
-    useContext(GameContext);
+  const {
+    showBoard,
+    squares,
+    players,
+    turn,
+    setDeedIndex,
+    die1,
+    die2,
+    alerts,
+  } = useContext(GameContext);
+  const { roomCode, myPlayerIndex } = useContext(SocketContext);
   const [zoom, setZoom] = useState(1);
 
   // Desktop may zoom out to 0.6; phones may not. Clamp when the viewport changes.
@@ -85,6 +142,17 @@ function Board() {
   }, []);
 
   if (!showBoard) return null;
+
+  // The roller is not stored: read it from the "X rolled N." log line.
+  // Its index also keys the dice so they re-animate once per roll.
+  let rollIdx = -1;
+  alerts.forEach((a, i) => {
+    if (/^(.+?) rolled (\d+)( - doubles)?\.$/.test(a)) rollIdx = i;
+  });
+  const rolled =
+    rollIdx >= 0
+      ? alerts[rollIdx].match(/^(.+?) rolled (\d+)( - doubles)?\.$/)
+      : null;
 
   const topRow = [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
   const bottomRow = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -104,19 +172,17 @@ function Board() {
     const there = players.filter(
       (p, i) => i > 0 && p.position === cellIndex && !p.jail,
     );
-    // Non-corner tiles are small: show 3 tokens and a +N chip past 4
-    const crowded = cellIndex % 10 !== 0 && there.length > 4;
+    // Show 3 pawns and a +N chip past 4
+    const crowded = there.length > 4;
     const shown = crowded ? there.slice(0, 3) : there;
     return [
       ...shown.map((p) => (
-        <div
+        <Pawn
           key={p.index}
-          className='cell-position disc'
-          title={p.name}
-          style={{ backgroundColor: p.color }}
-        >
-          <span className='disc-num'>{p.index}</span>
-        </div>
+          color={p.color}
+          n={p.index}
+          className={`pawn-board${p.index === turn ? ' is-turn' : ''}`}
+        />
       )),
       crowded && (
         <div
@@ -142,6 +208,8 @@ function Board() {
     const here = players.filter(
       (p, i) => i > 0 && p.position === index && !p.jail,
     );
+    const jailed =
+      index === 10 ? players.filter((p, i) => i > 0 && p.jail) : [];
     const shortName = SHORT_NAMES[index] || `${name.slice(0, 5)}.`;
     const label = isProperty
       ? `${name}, ${GROUP_NAMES[sq.groupNumber] || 'property'}, $${sq.price}, ${
@@ -159,14 +227,32 @@ function Board() {
           here.length > 0
             ? `, players here: ${here.map((p) => p.name).join(', ')}`
             : ''
+        }${
+          jailed.length > 0
+            ? `, in jail: ${jailed.map((p) => p.name).join(', ')}`
+            : ''
         }`;
 
     return (
       <div
         key={index}
-        className={`${getCellClass(index)}${hasStrip ? ' has-strip' : ''}`}
+        className={`${getCellClass(index)}${hasStrip ? ' has-strip' : ''}${
+          CORNERS[index] ? ` ${CORNERS[index].tint}` : ''
+        }${owner ? ' has-owner' : ''}${
+          here.length + jailed.length > 0 ? ' occupied' : ''
+        }${jailed.length > 0 ? ' has-jailed' : ''}${
+          players[turn] &&
+          players[turn].position === index &&
+          !players[turn].jail
+            ? ' is-current'
+            : ''
+        }`}
         id={`cell${index}`}
-        style={{ gridColumn: col, gridRow: row }}
+        style={{
+          gridColumn: col,
+          gridRow: row,
+          '--o': owner ? owner.color : undefined,
+        }}
         role={isProperty ? 'button' : 'img'}
         tabIndex={isProperty ? 0 : undefined}
         aria-label={label}
@@ -205,39 +291,69 @@ function Board() {
           </>
         )}
         <div className='cell-name' aria-hidden='true'>
-          <span className='short'>
-            {SQUARE_ICONS[index] ? (
-              <img src={`/images/${SQUARE_ICONS[index]}.png`} alt='' />
-            ) : (
-              shortName
-            )}
-          </span>
-          <span className='full'>
-            {/* soft hyphens: safety net where the browser has no hyphenation dictionary */}
-            {name
-              .replace('Mediterranean', 'Medi\u00ADter\u00ADra\u00ADnean')
-              .replace('Pennsylvania', 'Penn\u00ADsyl\u00ADva\u00ADnia')
-              .replace('Connecticut', 'Con\u00ADnect\u00ADi\u00ADcut')}
-          </span>
+          {CORNERS[index] ? (
+            <span className='corner'>
+              <SquareIcon kind={SQUARE_KINDS[index]} size={null} />
+              <b className='corner-title'>{CORNERS[index].title}</b>
+              {CORNERS[index].sub && (
+                <span className='corner-sub'>{CORNERS[index].sub}</span>
+              )}
+            </span>
+          ) : (
+            <>
+              {SQUARE_KINDS[index] && (
+                <span className='cell-icon'>
+                  <SquareIcon kind={SQUARE_KINDS[index]} size={null} />
+                </span>
+              )}
+              {(!SQUARE_KINDS[index] || SQUARE_KINDS[index] === 'rail') && (
+                <span className='short'>
+                  {SQUARE_KINDS[index] ? 'RR' : shortName}
+                </span>
+              )}
+              <span className='full'>
+                {/* soft hyphens: safety net where the browser has no hyphenation dictionary */}
+                {name
+                  .replace('Mediterranean', 'Medi\u00ADter\u00ADra\u00ADnean')
+                  .replace('Pennsylvania', 'Penn\u00ADsyl\u00ADva\u00ADnia')
+                  .replace('Connecticut', 'Con\u00ADnect\u00ADi\u00ADcut')}
+              </span>
+              {(isProperty || index === 4 || index === 38) && (
+                <span className='cell-price'>{sq.pricetext}</span>
+              )}
+            </>
+          )}
         </div>
         {owner && (
-          <>
-            <div
-              className='cell-owner'
-              style={{ backgroundColor: owner.color }}
-            />
-            <span
-              className='cell-owner-badge'
-              role='img'
-              aria-label={`owned by ${owner.name}`}
-              title={`Owned by ${owner.name}`}
-              style={{ backgroundColor: owner.color }}
-            >
-              <span className='disc-num'>{owner.index}</span>
-            </span>
-          </>
+          <span
+            className='cell-flag'
+            role='img'
+            aria-label={`owned by ${owner.name}`}
+            title={`Owned by ${owner.name}`}
+            style={{
+              '--num': prefersInk(owner.color) ? '#1c1917' : '#fff',
+              '--halo': prefersInk(owner.color) ? '#fff' : '#1c1917',
+            }}
+          >
+            <span className='disc-num'>{owner.index}</span>
+          </span>
         )}
         <div className='cell-position-holder'>{getPlayerPositions(index)}</div>
+        {jailed.length > 0 && (
+          <div className='jailed'>
+            {jailed.slice(0, 4).map((p) => (
+              <Pawn
+                key={p.index}
+                color={p.color}
+                n={p.index}
+                className='pawn-board'
+              />
+            ))}
+            {jailed.length > 4 && (
+              <span className='cell-position-more'>+{jailed.length - 4}</span>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -280,33 +396,43 @@ function Board() {
               {bottomRow.map((i, c) => renderCell(i, c + 1, 11))}
               {leftCol.map((i, r) => renderCell(i, 1, r + 2))}
               <div className='board-center'>
-                <div className='board-center-logo'>Monopoly</div>
+                <div className='plate plate-sm'>Monopoly</div>
+                <div className='centre-dice' aria-hidden={die1 === 0}>
+                  <div
+                    key={`a${rollIdx}`}
+                    className={`die die-${die1 || 1} ${die1 ? 'die-roll' : 'die-idle'}`}
+                    role='img'
+                    aria-label={`Die ${die1}`}
+                  />
+                  <div
+                    key={`b${rollIdx}`}
+                    className={`die die-${die2 || 1} ${die2 ? 'die-roll' : 'die-idle'}`}
+                    role='img'
+                    aria-label={`Die ${die2}`}
+                  />
+                </div>
+                {rolled && (
+                  <p className='centre-cap'>
+                    {rolled[1]} rolled {parseInt(rolled[2]) || 0}
+                    {rolled[3] ? ' · Doubles!' : ''}
+                  </p>
+                )}
                 {players[turn] && (
-                  <div className='turn-chip'>
-                    <span
-                      className='disc h-5 w-5 text-xs'
-                      style={{ backgroundColor: players[turn].color }}
-                    >
-                      <span className='disc-num'>{players[turn].index}</span>
-                    </span>
+                  <div key={turn} className='turn-banner'>
+                    <Pawn
+                      color={players[turn].color}
+                      n={players[turn].index}
+                      size={28}
+                    />
                     <span className='name'>{players[turn].name}&apos;s turn</span>
+                    {roomCode && turn === myPlayerIndex && (
+                      <span className='pill pill-turn'>You</span>
+                    )}
                   </div>
                 )}
-                <div id='jail'>
-                  {players
-                    .filter((p, i) => i > 0 && p.jail)
-                    .map((p) => (
-                      <div
-                        key={p.index}
-                        className='cell-position disc'
-                        title={p.name}
-                        style={{ backgroundColor: p.color }}
-                      >
-                        <span className='disc-num'>{p.index}</span>
-                      </div>
-                    ))}
-                  <span className='jail-label'>IN JAIL</span>
-                </div>
+                {alerts.length > 0 && (
+                  <p className='event-line'>{alerts[alerts.length - 1]}</p>
+                )}
               </div>
             </div>
           </div>

@@ -20,6 +20,17 @@ const COLORS = [
 
 // Starting cash choices the host may pick before the game starts
 const STARTING_MONEY_OPTIONS = [500, 1000, 1500, 2000, 5000, 10000];
+const DEFAULT_STARTING_MONEY = 1500;
+
+// A player is eliminated when money drops below minus the starting cash
+// (keep identical to client/src/game/constants.jsx)
+function bankruptcyLimit(startingMoney = DEFAULT_STARTING_MONEY) {
+  return -startingMoney;
+}
+
+function isEliminated(player, startingMoney = DEFAULT_STARTING_MONEY) {
+  return player.money < bankruptcyLimit(startingMoney);
+}
 
 // Max size of a gameState once JSON-encoded (socket packet cap is 100KB)
 const MAX_STATE_BYTES = 90000;
@@ -74,7 +85,13 @@ function checkStateShape(gameState) {
 // - close: the server applies the result itself (winner pays the stored bid,
 //   gets the square) and ignores the money/owner the bidder sent; the turn
 //   must stay or be the next live seat
-function bidderUpdate(stored, state, seat, roomTurn) {
+function bidderUpdate(
+  stored,
+  state,
+  seat,
+  roomTurn,
+  startingMoney = DEFAULT_STARTING_MONEY,
+) {
   const keys = ['auction', 'players', 'squares', 'turn'];
   if (!Object.keys(state).every((k) => keys.includes(k))) return null;
   const a = state.auction;
@@ -123,7 +140,7 @@ function bidderUpdate(stored, state, seat, roomTurn) {
     let next = roomTurn;
     for (let i = 1; i < players.length; i++) {
       next = (next % (players.length - 1)) + 1;
-      if (players[next].position >= 0 && players[next].money >= -1500) break;
+      if (players[next].position >= 0 && !isEliminated(players[next], startingMoney)) break;
     }
     if (state.turn !== undefined && state.turn !== roomTurn && state.turn !== next) {
       return null;
@@ -208,11 +225,14 @@ function makeToken() {
 
 module.exports = {
   STARTING_MONEY_OPTIONS,
+  DEFAULT_STARTING_MONEY,
   isPlainObject,
   sanitizeName,
   normalizeColor,
   checkStateShape,
   bidderUpdate,
+  bankruptcyLimit,
+  isEliminated,
   clientIp,
   makeRoomCode,
   makeToken,

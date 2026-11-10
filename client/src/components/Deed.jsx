@@ -62,6 +62,7 @@ function Deed() {
               variant='ghost'
               size='sm'
               aria-label='Close'
+              className='lg:min-h-11!'
               onClick={() => setDeedIndex(-1)}
             >
               ×

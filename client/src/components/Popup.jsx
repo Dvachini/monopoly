@@ -1,4 +1,4 @@
-import React, { useContext, useRef } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import Button from './Button.jsx';
 import useDialogFocus from './useDialogFocus.jsx';
@@ -8,6 +8,31 @@ function Popup() {
   const dialogRef = useRef(null);
 
   useDialogFocus(Boolean(popupData), dialogRef);
+
+  // Scrim click and Esc act like the safe button: No for Yes/No, OK for OK
+  const dismiss = () => {
+    if (
+      popupData &&
+      popupData.option &&
+      popupData.option.toLowerCase() !== 'yes/no' &&
+      popupData.option.toLowerCase() !== 'blank' &&
+      typeof popupData.action === 'function'
+    ) {
+      popupData.action();
+    } else if (popupData && !popupData.option && typeof popupData.action === 'function') {
+      popupData.action();
+    }
+    closePopup();
+  };
+
+  useEffect(() => {
+    if (!popupData) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') dismiss();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [popupData]);
 
   if (!popupData) return null;
 
@@ -31,8 +56,8 @@ function Popup() {
   return (
     <>
       <div
-        className='modal-overlay fixed inset-0 bg-black/55 z-10'
-        onClick={closePopup}
+        className='scrim [--z:var(--z-confirm)]'
+        onClick={dismiss}
       />
       <div
         ref={dialogRef}
@@ -40,9 +65,9 @@ function Popup() {
         role='dialog'
         aria-modal='true'
         aria-label='Message'
-        className='fixed inset-0 flex items-center justify-center z-13 select-none p-4 pointer-events-none'
+        className='dialog-wrap select-none [--z:var(--z-confirm)]'
       >
-        <div className='modal w-full max-w-sm min-w-0 text-base p-5 text-center wrap-break-word leading-normal z-13 select-none pointer-events-auto'>
+        <div className='modal modal-body min-w-0 text-base text-center wrap-break-word leading-normal select-none'>
           <div className='relative'>
             <div className='overflow-x-auto'>
               {/* message: array = one paragraph per item (nested array = lines
@@ -70,15 +95,17 @@ function Popup() {
               ))}
             </div>
             {opt === 'yes/no' ? (
-              <div className='mt-3 flex gap-2 justify-center'>
-                <Button variant='primary' onClick={handleYes}>
+              <div className='mt-3 flex gap-3'>
+                <Button full onClick={handleNo}>
+                  No
+                </Button>
+                <Button variant='primary' full onClick={handleYes}>
                   Yes
                 </Button>
-                <Button onClick={handleNo}>No</Button>
               </div>
             ) : opt !== 'blank' ? (
               <div className='mt-3'>
-                <Button variant='primary' onClick={handleOk}>
+                <Button variant='primary' full onClick={handleOk}>
                   OK
                 </Button>
               </div>

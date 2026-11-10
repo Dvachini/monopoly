@@ -6,6 +6,8 @@ const {
   isPlainObject,
   checkStateShape,
   bidderUpdate,
+  bankruptcyLimit,
+  isEliminated,
   clientIp,
   makeRoomCode,
   makeToken,
@@ -155,6 +157,44 @@ test('bidderUpdate close only when the pass rules end the auction', () => {
   // nobody bid, all passed: closes with no sale
   const allPassed = { ...open, auctionTurn: 1, passCount: 1 };
   assert.ok(bidderUpdate(stored(allPassed), { auction: shut }, 2, 1));
+});
+
+test('bankruptcyLimit scales with starting money, default 1500', () => {
+  for (const amount of [500, 1000, 1500, 2000, 5000, 10000]) {
+    assert.strictEqual(bankruptcyLimit(amount), -amount);
+  }
+  assert.strictEqual(bankruptcyLimit(), -1500);
+});
+
+test('isEliminated: exactly -startingMoney stays in, one below is out', () => {
+  for (const amount of [500, 1500, 5000]) {
+    assert.strictEqual(isEliminated({ money: -amount }, amount), false);
+    assert.strictEqual(isEliminated({ money: -amount - 1 }, amount), true);
+  }
+  assert.strictEqual(isEliminated({ money: -1500 }), false);
+  assert.strictEqual(isEliminated({ money: -1501 }), true);
+});
+
+test('bidderUpdate close skips a seat eliminated under the relative limit', () => {
+  const held = { ...open, auctionBid: 100, auctionBidder: 3, auctionTurn: 1 };
+  // startingMoney 500: seat 1 at -501 is eliminated, so next is 2 and turn 1 is rejected
+  const out = stored(held);
+  out.players[1].money = -501;
+  assert.strictEqual(bidderUpdate(out, { auction: shut, turn: 1 }, 2, 3, 500), null);
+  assert.ok(bidderUpdate(out, { auction: shut, turn: 2 }, 2, 3, 500));
+  // seat 1 at -400 under 500 is alive: turn 1 accepted
+  const alive = stored(held);
+  alive.players[1].money = -400;
+  assert.ok(bidderUpdate(alive, { auction: shut, turn: 1 }, 2, 3, 500));
+  // at -1000 default 1500 is alive, at 500 it is eliminated
+  const mid = stored(held);
+  mid.players[1].money = -1000;
+  assert.ok(bidderUpdate(mid, { auction: shut, turn: 1 }, 2, 3));
+  assert.strictEqual(bidderUpdate(mid, { auction: shut, turn: 1 }, 2, 3, 500), null);
+  // boundary: exactly -500 under 500 is alive
+  const edge = stored(held);
+  edge.players[1].money = -500;
+  assert.ok(bidderUpdate(edge, { auction: shut, turn: 1 }, 2, 3, 500));
 });
 
 test('clientIp trusts proxy headers only from a private peer', () => {

@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import Button from './Button.jsx';
+import Pawn from './Pawn.jsx';
+import Cash from './Cash.jsx';
 import useDialogFocus from './useDialogFocus.jsx';
 
 function Stats() {
@@ -26,7 +28,7 @@ function Stats() {
   return (
     <>
       <div
-        className='fixed inset-0 bg-black/50 backdrop-blur-sm z-16'
+        className='scrim'
         onClick={() => setShowStats(false)}
       />
       <div
@@ -34,85 +36,64 @@ function Stats() {
         tabIndex={-1}
         role='dialog'
         aria-modal='true'
-        aria-label='Stats'
-        className='fixed inset-0 flex items-center justify-center z-17 select-none p-4 pointer-events-none'
+        aria-labelledby='stats-title'
+        className='dialog-wrap select-none'
       >
-        <div className='w-full max-w-3xl min-w-0 max-h-[80vh] overflow-y-auto font-sans text-sm p-5 text-center wrap-break-word leading-normal border border-line rounded-2xl bg-card text-ink relative select-none shadow-2xl pointer-events-auto'>
-          <div className='relative'>
+        <div className='modal [--w:48rem]'>
+          <div className='modal-head'>
+            <h2 id='stats-title' className='modal-title'>
+              Player stats
+            </h2>
             <Button
+              variant='ghost'
               size='sm'
               aria-label='Close'
-              className='absolute -top-3 -right-3 z-17 rounded-full'
+              className='lg:min-h-11!'
               onClick={() => setShowStats(false)}
             >
               ×
             </Button>
-            <div className='overflow-hidden min-h-17.5'>
-              <table className='mx-auto'>
-                <tbody>
-                  <tr>
-                    {Array.from(
-                      { length: Math.min(pcount, 4) },
-                      (_, i) => i + 1,
-                    ).map((idx) => {
-                      const p = players[idx];
-                      if (!p) return null;
-                      return (
-                        <td
-                          key={idx}
-                          className='statscell'
-                          style={{ border: `2px solid ${p.color}` }}
-                        >
-                          <div className='statsplayername'>{p.name}</div>
-                          {squares
-                            .filter((sq) => sq && sq.owner === idx)
-                            .map((sq, j) => (
-                              <div key={j} className='text-left'>
-                                <span
-                                  className='statscellcolor inline-block w-5 h-5'
-                                  style={{ backgroundColor: sq.color }}
-                                />{' '}
-                                {sq.name}
-                              </div>
-                            ))}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                  {pcount > 4 && (
-                    <tr>
-                      {Array.from(
-                        { length: Math.min(pcount - 4, 4) },
-                        (_, i) => i + 5,
-                      ).map((idx) => {
-                        const p = players[idx];
-                        if (!p) return null;
-                        return (
-                          <td
-                            key={idx}
-                            className='statscell'
-                            style={{ border: `2px solid ${p.color}` }}
-                          >
-                            <div className='statsplayername'>{p.name}</div>
-                            {squares
-                              .filter((sq) => sq && sq.owner === idx)
-                              .map((sq, j) => (
-                                <div key={j} className='text-left'>
-                                  <span
-                                    className='statscellcolor inline-block w-5 h-5'
-                                    style={{ backgroundColor: sq.color }}
-                                  />{' '}
-                                  {sq.name}
-                                </div>
-                              ))}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          </div>
+          <div className='modal-body grid gap-3 text-sm sm:grid-cols-2'>
+            {Array.from({ length: pcount }, (_, i) => i + 1).map((idx) => {
+              const p = players[idx];
+              if (!p) return null;
+              return (
+                <section
+                  key={idx}
+                  className='min-w-0 rounded-[10px] border border-line bg-card p-2'
+                  style={{ borderLeft: `5px solid ${p.color}` }}
+                >
+                  <div className='flex items-center gap-2 font-bold'>
+                    <Pawn color={p.color} n={idx} size={34} />
+                    <span className='min-w-0 flex-1 truncate'>{p.name}</span>
+                    <Cash value={p.money} />
+                  </div>
+                  <ul className='mt-2'>
+                    {squares
+                      .filter((sq) => sq && sq.owner === idx)
+                      .map((sq) => (
+                        <li key={sq.index} className='flex items-center gap-2 py-0.5'>
+                          <i
+                            className='deed-mini'
+                            style={{ backgroundColor: sq.color, width: 10, height: 14 }}
+                          />
+                          <span className='min-w-0 flex-1'>{sq.name}</span>
+                          <span className='text-xs text-ink-muted'>
+                            {sq.mortgage
+                              ? 'Mortgaged'
+                              : sq.house === 5
+                                ? 'Hotel'
+                                : sq.house > 0
+                                  ? `${sq.house} ${sq.house === 1 ? 'house' : 'houses'}`
+                                  : ''}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </section>
+              );
+            })}
           </div>
         </div>
       </div>

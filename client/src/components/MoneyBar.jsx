@@ -2,12 +2,29 @@ import React, { useContext, useState, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
 import Button from './Button.jsx';
+import Pawn from './Pawn.jsx';
+import Cash from './Cash.jsx';
+import { bankruptcyLimit } from '../game/constants.jsx';
 
 function MoneyBar() {
-  const { showMoneyBar, players, pcount, turn, setShowStats } =
-    useContext(GameContext);
-  const { roomCode, myPlayerIndex, connected, renamePlayer, renameError } =
-    useContext(SocketContext);
+  const {
+    showMoneyBar,
+    players,
+    squares,
+    pcount,
+    turn,
+    setShowStats,
+    startingMoney: localStartingMoney,
+  } = useContext(GameContext);
+  const {
+    roomCode,
+    myPlayerIndex,
+    connected,
+    renamePlayer,
+    renameError,
+    startingMoney: socketStartingMoney,
+  } = useContext(SocketContext);
+  const startingMoney = roomCode ? socketStartingMoney : localStartingMoney;
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -51,60 +68,82 @@ function MoneyBar() {
       <ul>
         {Array.from({ length: 8 }, (_, i) => i + 1)
           .filter((idx) => idx <= pcount)
-          .map((idx) => (
+          .map((idx) => {
+            const owned = squares
+              .filter((sq) => sq && sq.owner === idx && sq.groupNumber > 0)
+              .sort((a, b) => a.groupNumber - b.groupNumber);
+            return (
             <li
               key={idx}
               id={`moneybarrow${idx}`}
-              className={`mb-1 flex min-h-11 items-center gap-2 rounded-md border-l-4 px-2 py-1 ${idx === turn ? 'border-gold ring-2 ring-gold' : 'border-line'} ${roomCode && idx === myPlayerIndex ? `bg-paper ${idx === turn ? '' : 'ring-2 ring-ink'}` : 'bg-card'}`}
-              style={{ borderLeftColor: players[idx] ? players[idx].color : undefined }}
+              className={`prow ${idx === turn ? 'prow-turn' : ''} ${roomCode && idx === myPlayerIndex ? 'prow-me' : ''}`}
+              style={{ '--o': players[idx] ? players[idx].color : 'gray' }}
             >
-              <span
-                className='disc h-6 w-6 text-xs'
-                style={{
-                  backgroundColor: players[idx] ? players[idx].color : 'gray',
-                }}
-              >
-                <span className='disc-num'>{idx}</span>
-              </span>
-              {roomCode && idx === myPlayerIndex && editing ? (
-                <input
-                  type='text'
-                  aria-label='Your name'
-                  autoFocus
-                  maxLength={20}
-                  value={draftName}
-                  onChange={(e) => setDraftName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') saveName();
-                    if (e.key === 'Escape') setEditing(false);
-                  }}
-                  className='min-h-11 min-w-0 flex-1 rounded-md border border-line-strong bg-card px-2 text-base text-ink'
-                />
-              ) : (
-                <span
-                  id={`p${idx}moneyname`}
-                  className='min-w-0 flex-1 truncate font-semibold text-ink'
-                >
-                  {players[idx] ? players[idx].name : `Player ${idx}`}
-                </span>
-              )}
-              {roomCode && idx === myPlayerIndex && (
-                <span className='rounded-full bg-ink px-2 text-xs font-bold text-paper'>
-                  You
-                </span>
-              )}
-              {idx === turn && (
-                <span className='rounded-full bg-gold px-2 text-xs font-bold text-ink'>
-                  Turn
-                </span>
-              )}
-              <span className='font-bold tabular-nums text-ink'>
-                $<span id={`p${idx}money`}>
-                  {players[idx] ? players[idx].money : 1500}
-                </span>
-              </span>
+              <Pawn
+                color={players[idx] ? players[idx].color : 'gray'}
+                n={idx}
+                size={34}
+              />
+              <div className='prow-main'>
+                <div className='prow-top'>
+                  {roomCode && idx === myPlayerIndex && editing ? (
+                    <input
+                      type='text'
+                      aria-label='Your name'
+                      autoFocus
+                      maxLength={20}
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveName();
+                        if (e.key === 'Escape') setEditing(false);
+                      }}
+                      className='field min-w-0 flex-1'
+                    />
+                  ) : (
+                    <span id={`p${idx}moneyname`}>
+                      {players[idx] ? players[idx].name : `Player ${idx}`}
+                    </span>
+                  )}
+                  {roomCode && idx === myPlayerIndex && (
+                    <span className='pill pill-you'>You</span>
+                  )}
+                  {idx === turn && <span className='pill pill-turn'>Turn</span>}
+                  <Cash
+                    id={`p${idx}money`}
+                    value={players[idx] ? players[idx].money : startingMoney}
+                  />
+                </div>
+                <div className='prow-sub'>
+                  <span
+                    className='deeds'
+                    role='img'
+                    aria-label={`${owned.length} properties${owned.length > 0 ? `: ${owned.map((sq) => sq.name).join(', ')}` : ''}`}
+                  >
+                    {owned.map((sq) => (
+                      <i
+                        key={sq.index}
+                        className={`deed-mini ${sq.groupNumber === 1 ? 'deed-rail' : sq.groupNumber === 2 ? 'deed-util' : ''} ${sq.mortgage ? 'deed-mort' : ''}`}
+                        style={{ backgroundColor: sq.color }}
+                      />
+                    ))}
+                  </span>
+                  <span>
+                    {owned.length} {owned.length === 1 ? 'property' : 'properties'}
+                  </span>
+                  {players[idx] &&
+                    players[idx].money < 0 &&
+                    players[idx].position >= 0 &&
+                    (!roomCode || idx === myPlayerIndex) && (
+                      <span className='prow-debt'>
+                        In debt. Bankrupt below -${-bankruptcyLimit(startingMoney)}
+                      </span>
+                    )}
+                </div>
+              </div>
             </li>
-          ))}
+            );
+          })}
       </ul>
       {roomCode && editing && (
         <div className='mb-1 flex gap-2'>

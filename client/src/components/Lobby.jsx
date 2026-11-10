@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import SocketContext from '../context/SocketContext.jsx';
 import GameContext from '../context/GameContext.jsx';
 import Button from './Button.jsx';
+import Pawn from './Pawn.jsx';
 import { STARTING_CASH_OPTIONS } from '../game/constants.jsx';
 
 const COLORS = [
@@ -88,10 +89,10 @@ function Lobby() {
   return (
     <div className='flex min-h-[calc(100dvh-2rem)] w-full flex-col max-sm:min-h-[calc(100dvh-1rem)] items-center justify-center p-3 pb-[8dvh] sm:p-5'>
       <div aria-hidden='true' className='mb-3 flex items-end gap-3'>
-        <div className='die die-five -rotate-8' />
-        <div className='die die-two rotate-10' />
+        <div className='die die-5 -rotate-8' />
+        <div className='die die-2 rotate-10' />
       </div>
-      <h1 className='wordmark mb-3'>Monopoly</h1>
+      <h1 className='plate wordmark mb-3'>Monopoly</h1>
       <p role='status' className='conn-pill mb-6'>
         <span
           aria-hidden='true'
@@ -135,17 +136,14 @@ function Lobby() {
       )}
 
       {mode && (
-        <div className='card flex w-full max-w-sm flex-col gap-3 p-4 sm:p-6'>
+        <div className='card card-gold flex w-full max-w-sm flex-col gap-3 p-4 sm:p-6'>
           <h2 className='font-display text-(--t-2xl) font-bold leading-tight'>
             {mode === 'create' ? 'Create Game' : 'Join Game'}
           </h2>
 
           {mode === 'join' && (
             <div>
-              <label
-                htmlFor='lobby-room-code'
-                className='mb-1 block text-sm font-semibold'
-              >
+              <label htmlFor='lobby-room-code' className='label'>
                 Room code
               </label>
               <input
@@ -159,16 +157,13 @@ function Lobby() {
                 autoCapitalize='characters'
                 autoComplete='off'
                 autoCorrect='off'
-                className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-center font-mono text-2xl uppercase tracking-[.3em] text-ink placeholder:text-[#6b6258]'
+                className='field text-center font-mono text-2xl uppercase tracking-[.3em]'
               />
             </div>
           )}
 
           <div>
-            <label
-              htmlFor='lobby-player-name'
-              className='mb-1 block text-sm font-semibold'
-            >
+            <label htmlFor='lobby-player-name' className='label'>
               Your name
             </label>
             <input
@@ -180,7 +175,7 @@ function Lobby() {
               placeholder='Enter your name'
               autoComplete='nickname'
               aria-describedby='lobby-name-help'
-              className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink placeholder:text-[#6b6258]'
+              className='field'
             />
             <p id='lobby-name-help' className='mt-1 text-xs text-ink-muted'>
               Up to 20 characters
@@ -188,7 +183,7 @@ function Lobby() {
           </div>
 
           <fieldset>
-            <legend className='mb-1 text-sm font-semibold'>Token colour</legend>
+            <legend className='label'>Token colour</legend>
             <div className='grid grid-cols-4 gap-2'>
               {COLORS.map((c) => {
                 const taken =
@@ -208,7 +203,7 @@ function Lobby() {
                     />
                     <label
                       htmlFor={`lobby-color-${c}`}
-                      className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 p-1 text-xs font-semibold text-ink peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-info ${
+                      className={`flex min-h-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-[10px] border-2 p-1 text-xs shadow-[0_2px_0_rgb(0_0_0/0.18)] font-semibold text-ink peer-focus-visible:outline-3 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-info ${
                         taken
                           ? 'cursor-not-allowed border-[#cfc3ab] bg-[#e7dfd0] text-ink-muted'
                           : playerColor === c
@@ -216,14 +211,12 @@ function Lobby() {
                             : 'border-line-strong bg-card'
                       }`}
                     >
-                      <span
-                        className='disc h-7 w-7'
-                        style={{ backgroundColor: c.toLowerCase() }}
-                      >
+                      <span className='relative inline-flex'>
+                        <Pawn color={c.toLowerCase()} n='' size={36} />
                         {taken && (
                           <svg
                             viewBox='0 0 28 28'
-                            className='h-7 w-7'
+                            className='absolute inset-0 h-full w-full'
                             aria-hidden='true'
                           >
                             <path
@@ -335,7 +328,7 @@ function Rejoining() {
     <div className='flex min-h-[calc(100dvh-2rem)] w-full flex-col max-sm:min-h-[calc(100dvh-1rem)] items-center justify-center p-3 pb-[8dvh] sm:p-5'>
       <div
         role='status'
-        className='card flex w-full max-w-sm flex-col items-center gap-3 p-6 text-center'
+        className='card card-gold flex w-full max-w-sm flex-col items-center gap-3 p-6 text-center'
       >
         <svg
           className='h-8 w-8 animate-spin text-info'
@@ -477,20 +470,32 @@ function WaitingRoom() {
 
   return (
     <div className='flex w-full flex-col items-center p-3 sm:p-5'>
-      <div className='card flex w-full max-w-md flex-col items-center gap-4 p-4 sm:p-6'>
-        <h1 className='font-display text-(--t-2xl) font-bold leading-tight'>
-          Waiting Room
-        </h1>
+      <div className='card card-gold flex w-full max-w-md flex-col items-center gap-4 p-4 sm:p-6'>
+        <h1 className='plate text-(--t-xl)'>Waiting Room</h1>
+        <p
+          role='status'
+          className={`status-pill ${roomPlayers.length < 2 ? 'waiting' : ''}`}
+        >
+          <span aria-hidden='true' className='conn-dot' />
+          {roomPlayers.length < 2
+            ? `Waiting for players - ${roomPlayers.length}/8`
+            : `Ready to start - ${roomPlayers.length}/8`}
+        </p>
 
         <div className='w-full rounded-[10px] border-2 border-line bg-card p-4 text-center'>
           <div className='mb-1 text-xs font-semibold text-ink-muted'>
             Room code
           </div>
           <div
+            role='img'
             aria-label={`Room code ${roomCode.split('').join(' ')}`}
-            className='font-mono text-(--t-code) font-bold tracking-[.2em] text-ink'
+            className='code'
           >
-            {roomCode}
+            {roomCode.split('').map((ch, i) => (
+              <span key={i} className='code-tile' aria-hidden='true'>
+                {ch}
+              </span>
+            ))}
           </div>
         </div>
 
@@ -543,15 +548,10 @@ function WaitingRoom() {
             {roomPlayers.map((p) => (
               <li
                 key={p.index}
-                className={`mb-1 flex min-h-13 items-center gap-2.5 rounded-md border border-line px-3 py-2 ${p.index === myPlayerIndex ? 'bg-white' : 'bg-card'}`}
-                style={{ borderLeft: `5px solid ${p.color}` }}
+                className={`prow ${p.index === myPlayerIndex ? 'prow-me' : ''}`}
+                style={{ '--o': p.color }}
               >
-                <span
-                  className='disc h-6 w-6 text-xs'
-                  style={{ backgroundColor: p.color }}
-                >
-                  <span className='disc-num'>{p.index}</span>
-                </span>
+                <Pawn color={p.color} n={p.index} size={34} />
                 {p.index === myPlayerIndex && editing ? (
                   <form onSubmit={saveName} className='flex min-w-0 flex-1 gap-1.5'>
                     <input
@@ -568,7 +568,7 @@ function WaitingRoom() {
                           setEditing(false);
                         }
                       }}
-                      className='min-h-11 min-w-0 flex-1 rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink'
+                      className='field min-w-0 flex-1'
                     />
                     <Button
                       type='submit'
@@ -587,7 +587,7 @@ function WaitingRoom() {
                     id='lobby-editname'
                     size='sm'
                     variant='ghost'
-                    className='lg:min-h-11!'
+                    className='underline lg:min-h-11!'
                     onClick={() => {
                       setRenameError('');
                       setDraftName(p.name);
@@ -599,14 +599,10 @@ function WaitingRoom() {
                 )}
                 <span className='ml-auto flex gap-1.5'>
                   {p.index === hostIndex && (
-                    <span className='rounded-full border border-line-strong px-2 text-xs font-semibold text-ink-2'>
-                      Host
-                    </span>
+                    <span className='pill pill-host'>Host</span>
                   )}
                   {p.index === myPlayerIndex && (
-                    <span className='rounded-full bg-ink px-2 text-xs font-semibold text-white'>
-                      You
-                    </span>
+                    <span className='pill pill-you'>You</span>
                   )}
                 </span>
               </li>
@@ -621,17 +617,14 @@ function WaitingRoom() {
 
         {isHost ? (
           <div className='w-full'>
-            <label
-              htmlFor='lobby-starting-cash'
-              className='mb-1 block text-sm font-semibold'
-            >
+            <label htmlFor='lobby-starting-cash' className='label'>
               Starting cash
             </label>
             <select
               id='lobby-starting-cash'
               value={startingMoney}
               onChange={(e) => setStartingMoney(parseInt(e.target.value, 10))}
-              className='min-h-11 w-full rounded-[10px] border border-line-strong bg-card px-3 text-base text-ink'
+              className='field'
             >
               {STARTING_CASH_OPTIONS.map((n) => (
                 <option key={n} value={n}>

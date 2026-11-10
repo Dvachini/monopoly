@@ -8,6 +8,7 @@ import Deed from '../components/Deed.jsx';
 import Trade from '../components/Trade.jsx';
 import Auction from '../components/Auction.jsx';
 import Button from '../components/Button.jsx';
+import Pawn from '../components/Pawn.jsx';
 import { useSocket } from '../context/SocketContext.jsx';
 import GameContext from '../context/GameContext.jsx';
 
@@ -63,7 +64,7 @@ function GameScreen() {
     const winner = remaining.length === 1 ? remaining[0] : null;
     return (
       <div className='flex w-full justify-center p-3 sm:p-5'>
-        <div className='card flex w-full max-w-md flex-col items-center gap-4 p-6 text-center sm:p-8'>
+        <div className='card card-gold flex w-full max-w-md flex-col items-center gap-4 p-6 text-center sm:p-8'>
           <svg
             viewBox='0 0 64 64'
             className='h-16 w-16'
@@ -94,18 +95,13 @@ function GameScreen() {
           <h1
             ref={gameOverRef}
             tabIndex={-1}
-            className='font-display text-(--t-3xl) font-bold leading-tight outline-none'
+            className='plate text-(--t-3xl) outline-none'
           >
             Game over
           </h1>
           {winner ? (
             <div className='flex items-center gap-3 font-display text-(--t-2xl) font-bold'>
-              <span
-                className='disc h-8 w-8 text-base'
-                style={{ backgroundColor: winner.color }}
-              >
-                <span className='disc-num'>{winner.index}</span>
-              </span>
+              <Pawn color={winner.color} n={winner.index} size={48} />
               {winner.name} wins the game!
             </div>
           ) : (
@@ -135,7 +131,7 @@ function GameScreen() {
       {roomCode && (!connected || showBack) && (
         <div
           aria-hidden='true'
-          className={`sticky inset-x-0 top-0 z-1000 flex min-h-11 flex-wrap items-center justify-center gap-x-3 gap-y-1 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sm ${connected ? 'bg-success text-white' : 'bg-[#7f1d1d] text-paper'}`}
+          className={`sticky inset-x-0 top-0 z-(--z-banner) flex min-h-11 flex-wrap items-center justify-center gap-x-3 gap-y-1 px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] text-sm ${connected ? 'bg-success text-white' : 'bg-[#7f1d1d] text-paper'}`}
         >
           {connected ? (
             'Back online'

@@ -1,6 +1,7 @@
 import React, { useContext, useState, useEffect, useRef } from 'react';
 import GameContext from '../context/GameContext.jsx';
 import SocketContext from '../context/SocketContext.jsx';
+import { isBankrupt } from '../game/constants.jsx';
 import Button from './Button.jsx';
 import useDialogFocus from './useDialogFocus.jsx';
 
@@ -31,10 +32,17 @@ function Auction() {
     addAlert,
     auctionEndTurnPending,
     setAuctionEndTurnPending,
+    startingMoney: localStartingMoney,
   } = useContext(GameContext);
 
-  const { socket, myPlayerIndex, roomCode, connected } =
-    useContext(SocketContext);
+  const {
+    socket,
+    myPlayerIndex,
+    roomCode,
+    connected,
+    startingMoney: socketStartingMoney,
+  } = useContext(SocketContext);
+  const startingMoney = roomCode ? socketStartingMoney : localStartingMoney;
 
   const [bidAmount, setBidAmount] = useState('');
   // Track consecutive passes — auction ends when passCount reaches auctionPlayers.length
@@ -215,7 +223,7 @@ function Auction() {
         if (
           ps[nextTurn] &&
           ps[nextTurn].position >= 0 &&
-          ps[nextTurn].money >= -1500
+          !isBankrupt(ps[nextTurn].money, startingMoney)
         ) {
           break;
         }
@@ -254,128 +262,144 @@ function Auction() {
 
   return (
     <>
-      <div className='fixed inset-0 modal-overlay bg-black/55 z-900' />
-      <div ref={dialogRef} tabIndex={-1} role='dialog' aria-modal='true' aria-label='Auction' className='modal fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 z-901 min-w-80 text-center max-sm:w-[90%] max-sm:min-w-0 max-sm:max-w-87.5 max-sm:p-4'>
-        <h3 className='m-0 mb-2.5 text-lg font-semibold'>Auction</h3>
-        <div
-          className='p-2.5 mb-2.5 bg-card rounded'
-          style={{
-            borderTop:
-              sq.color !== '#FFFFFF' ? `6px solid ${sq.color}` : 'none',
-          }}
-        >
-          <div className='font-bold text-base'>{sq.name}</div>
-          <div className='text-ink-muted'>List price: {sq.pricetext}</div>
-        </div>
+      {/* No scrim click, Esc or close button: the auction needs a decision */}
+      <div className='scrim' />
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role='dialog'
+        aria-modal='true'
+        aria-labelledby='auction-title'
+        className='dialog-wrap select-none'
+      >
+        <div className='modal text-center'>
+          <div className='modal-head'>
+            <h2 id='auction-title' className='modal-title'>
+              Auction
+            </h2>
+          </div>
+          <div className='modal-body'>
+            <div
+              className='p-2.5 mb-2.5 bg-card rounded'
+              style={{
+                borderTop:
+                  sq.color !== '#FFFFFF' ? `6px solid ${sq.color}` : 'none',
+              }}
+            >
+              <div className='font-bold text-base'>{sq.name}</div>
+              <div className='text-ink-muted'>List price: {sq.pricetext}</div>
+            </div>
 
-        <div className='mb-2.5'>
-          <div className='text-sm'>
-            Current bid: <strong>${auctionBid}</strong>
-            {auctionBidder > 0 && (
-              <span>
-                {' '}
-                by{' '}
-                <span className='font-semibold'>
-                  {players[auctionBidder]?.name}
-                </span>
-              </span>
+            <div className='mb-2.5'>
+              <div className='text-sm'>
+                Current bid: <strong>${auctionBid}</strong>
+                {auctionBidder > 0 && (
+                  <span>
+                    {' '}
+                    by{' '}
+                    <span className='font-semibold'>
+                      {players[auctionBidder]?.name}
+                    </span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div
+              className='p-2.5 mb-2.5 bg-card rounded'
+              style={{
+                borderLeft: `4px solid ${currentBidderPlayer?.color || 'gray'}`,
+              }}
+            >
+              <div className='font-bold'>
+                {currentBidderPlayer?.name}'s turn to bid
+              </div>
+              <div className='text-[13px] text-ink-muted'>
+                Cash: ${currentBidderPlayer?.money} &middot; Min bid: $
+                {auctionBid + 1}
+              </div>
+            </div>
+
+            <div className='mb-2.5 flex items-center justify-center gap-1.5'>
+              <span aria-hidden='true'>$</span>
+              <input
+                type='number'
+                inputMode='numeric'
+                step={1}
+                aria-label='Bid amount'
+                aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
+                value={bidAmount}
+                onChange={(e) => setBidAmount(e.target.value)}
+                placeholder={`Min $${auctionBid + 1}`}
+                className='field bid-field'
+                min={auctionBid + 1}
+                max={currentBidderPlayer?.money}
+                disabled={!isMyAuctionTurn}
+              />
+              <Button
+                variant='primary'
+                onClick={handleBid}
+                disabled={
+                  !isMyAuctionTurn ||
+                  (roomCode && !connected) ||
+                  bidError
+                }
+                aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
+              >
+                Bid
+              </Button>
+              <Button
+                onClick={handlePass}
+                disabled={!isMyAuctionTurn || (roomCode && !connected)}
+              >
+                Pass
+              </Button>
+            </div>
+
+            {isMyAuctionTurn && (
+              <div id='bid-hint' className='text-ink-muted text-[13px] mb-2'>
+                {(currentBidderPlayer?.money || 0) < auctionBid + 1
+                  ? `You need more than $${auctionBid} to bid; your cash is $${currentBidderPlayer?.money || 0}. You can pass.`
+                  : `Bid must be between $${auctionBid + 1} and your cash $${currentBidderPlayer?.money || 0}.`}
+              </div>
             )}
+
+            {roomCode && !isMyAuctionTurn && (
+              <div className='text-ink-muted italic text-[13px] mb-2'>
+                Waiting for {currentBidderPlayer?.name} to bid...
+              </div>
+            )}
+
+            {passCount > 0 && (
+              <div className='text-sm text-ink-muted mb-1'>
+                Passed:{' '}
+                {Array.from({ length: passCount }, (_, k) => {
+                  const who =
+                    players[
+                      auctionPlayers[
+                        (auctionTurn - 1 - k + auctionPlayers.length * 2) %
+                          auctionPlayers.length
+                      ]
+                    ];
+                  return who ? who.name : '';
+                }).join(', ')}
+              </div>
+            )}
+
+            <div className='text-xs text-ink-muted'>
+              {auctionPlayers.length} player{auctionPlayers.length !== 1 ? 's' : ''}{' '}
+              in auction
+              {auctionBid > 0 && passCount > 0 && (
+                <span>
+                  {' '}
+                  &middot; {passCount} pass{passCount !== 1 ? 'es' : ''} (ends at{' '}
+                  {auctionPlayers.length - 1})
+                </span>
+              )}
+            </div>
           </div>
         </div>
-
-        <div
-          className='p-2.5 mb-2.5 bg-card rounded'
-          style={{
-            borderLeft: `4px solid ${currentBidderPlayer?.color || 'gray'}`,
-          }}
-        >
-          <div className='font-bold'>
-            {currentBidderPlayer?.name}'s turn to bid
-          </div>
-          <div className='text-[13px] text-ink-muted'>
-            Cash: ${currentBidderPlayer?.money} &middot; Min bid: $
-            {auctionBid + 1}
-          </div>
         </div>
-
-        <div className='mb-2.5 flex items-center justify-center gap-1.5'>
-          <span aria-hidden='true'>$</span>
-          <input
-            type='number'
-            inputMode='numeric'
-            step={1}
-            aria-label='Bid amount'
-            aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
-            value={bidAmount}
-            onChange={(e) => setBidAmount(e.target.value)}
-            placeholder={`Min $${auctionBid + 1}`}
-            className='w-28 min-h-11 px-2 text-base border border-line-strong bg-card text-ink rounded-md'
-            min={auctionBid + 1}
-            max={currentBidderPlayer?.money}
-            disabled={!isMyAuctionTurn}
-          />
-          <Button
-            variant='primary'
-            onClick={handleBid}
-            disabled={
-              !isMyAuctionTurn ||
-              (roomCode && !connected) ||
-              bidError
-            }
-            aria-describedby={isMyAuctionTurn ? 'bid-hint' : undefined}
-          >
-            Bid
-          </Button>
-          <Button
-            onClick={handlePass}
-            disabled={!isMyAuctionTurn || (roomCode && !connected)}
-          >
-            Pass
-          </Button>
-        </div>
-
-        {isMyAuctionTurn && (
-          <div id='bid-hint' className='text-ink-muted text-[13px] mb-2'>
-            {(currentBidderPlayer?.money || 0) < auctionBid + 1
-              ? `You need more than $${auctionBid} to bid; your cash is $${currentBidderPlayer?.money || 0}. You can pass.`
-              : `Bid must be between $${auctionBid + 1} and your cash $${currentBidderPlayer?.money || 0}.`}
-          </div>
-        )}
-
-        {roomCode && !isMyAuctionTurn && (
-          <div className='text-ink-muted italic text-[13px] mb-2'>
-            Waiting for {currentBidderPlayer?.name} to bid...
-          </div>
-        )}
-
-        {passCount > 0 && (
-          <div className='text-sm text-ink-muted mb-1'>
-            Passed:{' '}
-            {Array.from({ length: passCount }, (_, k) => {
-              const who =
-                players[
-                  auctionPlayers[
-                    (auctionTurn - 1 - k + auctionPlayers.length * 2) %
-                      auctionPlayers.length
-                  ]
-                ];
-              return who ? who.name : '';
-            }).join(', ')}
-          </div>
-        )}
-
-        <div className='text-xs text-ink-muted'>
-          {auctionPlayers.length} player{auctionPlayers.length !== 1 ? 's' : ''}{' '}
-          in auction
-          {auctionBid > 0 && passCount > 0 && (
-            <span>
-              {' '}
-              &middot; {passCount} pass{passCount !== 1 ? 'es' : ''} (ends at{' '}
-              {auctionPlayers.length - 1})
-            </span>
-          )}
-        </div>
-      </div>
     </>
   );
 }

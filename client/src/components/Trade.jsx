@@ -193,23 +193,39 @@ function Trade() {
     setRightJailCard(false);
   };
 
+  const cancelTrade = () => {
+    setShowTrade(false);
+    resetTrade();
+  };
+
   return (
-    <div className='fixed inset-0 z-14 flex items-start justify-center pt-4 pb-4'>
-      <div
-        className='modal-overlay fixed inset-0 bg-black/55'
-        onClick={() => {
-          setShowTrade(false);
-          resetTrade();
-        }}
-      />
+    <>
+      {/* Scrim click does nothing: it would throw away what was typed */}
+      <div className='scrim' />
       <div
         ref={dialogRef}
         tabIndex={-1}
         role='dialog'
         aria-modal='true'
-        aria-label='Trade'
-        className='modal relative w-[92%] max-w-xl p-4 max-h-[90dvh] overflow-y-auto'
+        aria-labelledby='trade-title'
+        className='dialog-wrap select-none'
       >
+      <div className='modal [--w:36rem]'>
+        <div className='modal-head'>
+          <h2 id='trade-title' className='modal-title'>
+            Trade
+          </h2>
+          <Button
+            variant='ghost'
+            size='sm'
+            aria-label='Close'
+            className='lg:min-h-11!'
+            onClick={cancelTrade}
+          >
+            ×
+          </Button>
+        </div>
+        <div className='modal-body'>
         <table className='w-full' style={{ borderSpacing: '3px' }}>
           <tbody>
             <tr>
@@ -350,32 +366,29 @@ function Trade() {
                   )}
               </td>
             </tr>
-            <tr>
-              <td colSpan='2' className='trade-cell'>
-                <Button
-                  variant='primary'
-                  id='proposetradebutton'
-                  onClick={handlePropose}
-                  title='Exchange the money and properties that are checked above.'
-                >
-                  Propose Trade
-                </Button>{' '}
-                <Button
-                  id='canceltradebutton'
-                  onClick={() => {
-                    setShowTrade(false);
-                    resetTrade();
-                  }}
-                  title='Cancel the trade.'
-                >
-                  Cancel Trade
-                </Button>
-              </td>
-            </tr>
           </tbody>
         </table>
+        </div>
+        <div className='modal-foot'>
+          <Button
+            id='canceltradebutton'
+            onClick={cancelTrade}
+            title='Cancel the trade.'
+          >
+            Cancel Trade
+          </Button>
+          <Button
+            variant='primary'
+            id='proposetradebutton'
+            onClick={handlePropose}
+            title='Exchange the money and properties that are checked above.'
+          >
+            Propose Trade
+          </Button>
+        </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

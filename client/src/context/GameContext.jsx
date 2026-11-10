@@ -8,6 +8,7 @@ import React, {
 import { classicEdition } from '../data/classicedition.jsx';
 import { newYorkCityEdition } from '../data/newyorkcityedition.jsx';
 import { AITest } from '../game/ai.jsx';
+import { DEFAULT_STARTING_CASH } from '../game/constants.jsx';
 
 const GameContext = createContext();
 
@@ -38,6 +39,7 @@ export function GameProvider({ children }) {
   const [showControl, setShowControl] = useState(false);
   const [showMoneyBar, setShowMoneyBar] = useState(false);
   const [activeTab, setActiveTab] = useState('buy'); // buy | manage
+  const [startingMoney, setStartingMoney] = useState(DEFAULT_STARTING_CASH); // local games; online uses SocketContext
 
   // Auction state
   const [auctionProperty, setAuctionProperty] = useState(null); // square index being auctioned
@@ -118,6 +120,8 @@ export function GameProvider({ children }) {
     setShowMoneyBar,
     activeTab,
     setActiveTab,
+    startingMoney,
+    setStartingMoney,
     auctionProperty,
     setAuctionProperty,
     auctionBid,
