@@ -12,13 +12,19 @@ import { useSocket } from '../context/SocketContext.jsx';
 import GameContext from '../context/GameContext.jsx';
 
 function GameScreen() {
-  const { status, players } = useContext(GameContext);
-  const { clearSession, connected, roomCode } = useSocket();
+  const { status, players, setShowMoneyBar } = useContext(GameContext);
+  const { clearSession, connected, roomCode, gameStarted } = useSocket();
 
   const [wasOffline, setWasOffline] = useState(false);
   const [showBack, setShowBack] = useState(false);
   const [longOffline, setLongOffline] = useState(false);
   const gameOverRef = useRef(null);
+
+  // After a refresh (rejoin) Setup never runs, so nothing turns the Players
+  // card on: show it as soon as the game has players
+  useEffect(() => {
+    if (gameStarted && players && players.length > 0) setShowMoneyBar(true);
+  }, [gameStarted, players]);
 
   // Game over: forget the saved seat so a refresh does not try to rejoin
   useEffect(() => {
