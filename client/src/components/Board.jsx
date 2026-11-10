@@ -316,7 +316,10 @@ function Board() {
                 {name
                   .replace('Mediterranean', 'Medi\u00ADter\u00ADra\u00ADnean')
                   .replace('Pennsylvania', 'Penn\u00ADsyl\u00ADva\u00ADnia')
-                  .replace('Connecticut', 'Con\u00ADnect\u00ADi\u00ADcut')}
+                  .replace('Connecticut', 'Con\u00ADnect\u00ADi\u00ADcut')
+                  .replace('Community', 'Com\u00ADmu\u00ADni\u00ADty')
+                  .replace('Tennessee', 'Ten\u00ADnes\u00ADsee')
+                  .replace('Boardwalk', 'Board\u00ADwalk')}
               </span>
               {(isProperty || index === 4 || index === 38) && (
                 <span className='cell-price'>{sq.pricetext}</span>

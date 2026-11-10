@@ -745,6 +745,7 @@ body {
     display: -webkit-box;
     font-size: clamp(0.625rem, 1.5cqi, 0.8125rem);
     hyphens: auto;
+    padding-inline: 3px;
     overflow-wrap: break-word;
     word-break: normal;
     -webkit-line-clamp: 3;
@@ -985,6 +986,41 @@ body {
 .pawn-board {
   height: var(--pawn);
   width: calc(var(--pawn) * 0.86);
+}
+
+/* 3rd/4th pawn tuck under the first row (1.6 pawns tall, not 2): heads stay
+   inside the board, every number stays visible */
+.cell-position-holder .pawn:nth-child(n + 3) {
+  margin-top: calc(var(--pawn) * -0.4);
+}
+
+/* corners: smaller pawns, label kept clear of them (pawns sit on the inner
+   corner; 0 and 10 hang from the top, 20 and 30 from the bottom) */
+.cell-corner .cell-position-holder {
+  width: calc(var(--pawn) * 1.3);
+}
+
+.cell-corner .cell-position-holder .pawn-board {
+  height: calc(var(--pawn) * 0.7);
+  width: calc(var(--pawn) * 0.6);
+}
+
+.cell-corner .cell-position-holder .pawn:nth-child(n + 3) {
+  margin-top: calc(var(--pawn) * -0.28);
+}
+
+#cell0.occupied .cell-name,
+#cell10.occupied .cell-name {
+  padding-top: calc(var(--pawn) * 0.6);
+}
+
+#cell20.occupied .cell-name,
+#cell30.occupied .cell-name {
+  padding-bottom: calc(var(--pawn) * 0.6);
+}
+
+.cell-corner.occupied .corner-sub {
+  display: none;
 }
 
 .pawn.is-turn {

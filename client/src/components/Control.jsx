@@ -843,7 +843,7 @@ function Control() {
                     onClick={() => setActiveTab('manage')}
                     disabled={auctionActive}
                     aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
-                    className={`min-h-11 flex-1 border-b-[3px] px-3 text-sm font-semibold disabled:opacity-60 ${activeTab === 'manage' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
+                    className={`min-h-11 flex-1 border-b-[3px] px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${activeTab === 'manage' ? 'border-gold bg-paper text-ink' : 'border-transparent bg-felt-deep text-paper'}`}
                   >
                     Manage
                   </button>
@@ -858,7 +858,7 @@ function Control() {
                   aria-describedby={auctionActive ? 'auction-lock-note' : undefined}
                   onClick={() => setShowTrade(true)}
                   disabled={auctionActive || (Boolean(roomCode) && !connected)}
-                  className='min-h-11 flex-1 rounded-tr-lg border-b-[3px] border-transparent bg-felt-deep px-3 text-sm font-semibold text-paper disabled:opacity-60'
+                  className='min-h-11 flex-1 rounded-tr-lg border-b-[3px] border-transparent bg-felt-deep px-3 text-sm font-semibold text-paper disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   Trade
                 </button>
@@ -1056,7 +1056,7 @@ function Control() {
           variant='ghost'
           size='sm'
           id='resignbutton'
-          className='lg:min-h-11! text-danger!'
+          className='min-w-11 lg:min-h-11! text-danger!'
           title={
             auctionActive
               ? 'Finish the auction first'
